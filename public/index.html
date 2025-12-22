@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Listing Form</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+
+<body>
+    <div class="container">
+        <form id="myForm">
+            <h3>Listing Form</h3>
+
+            <label>Nama Pengirim</label>
+            <input type="text" id="nama" placeholder="Contoh: Budi" required>
+
+            <label>Pilih Rank</label>
+            <select id="rank">
+                <option value="High Rank">High Rank</option>
+                <option value="Life Member">Life Member</option>
+                <option value="Tail Gunner">Tail Gunner</option>
+                <option value="Prospect">Prospect</option>
+            </select>
+
+            <label>Tipe Layanan</label>
+            <select id="tipe" onchange="updateSubTipe()">
+                <option value="">-- Pilih Tipe --</option>
+                <option value="Bundling">Bundling</option>
+                <option value="Non Bundling">Non Bundling</option>
+            </select>
+
+            <div id="subTipeContainer" style="display:none;">
+                <label id="labelSubTipe"></label>
+                <select id="subTipe" onchange="updateFinalOptions()">
+                </select>
+            </div>
+
+            <div id="finalOptionsContainer"
+                style="display:none; background: #2c2f33; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                <label>Pilih Item (Bisa pilih beberapa):</label>
+                <div id="checkboxList">
+                </div>
+            </div>
+
+            <div id="jumlahContainer">
+                <label>Jumlah Paket</label>
+                <input type="number" id="jumlah" placeholder="0" min="1" value="1">
+            </div>
+
+            <button type="submit" id="submitBtn">Kirim</button>
+        </form>
+    </div>
+
+    <footer>
+        <p>&copy; <span id="year"></span> <b>ListingForm</b>. All Rights Reserved.</p>
+        <p>Created with ❤️ by
+            <a href="https://discord.gg/XaEeRXkN4G" target="_blank" class="footer-link">
+                <b>Nakama MC</b>
+            </a>
+        </p>
+    </footer>
+
+    <script>
+        // Script otomatis update tahun di footer
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        document.getElementById('myForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+
+            // AMBIL NILAI TIPE (Penting!)
+            const tipeVal = document.getElementById('tipe').value;
+
+            // AMBIL RINCIAN ITEM
+            const itemElements = document.querySelectorAll('.item-qty');
+            let rincianItem = [];
+            itemElements.forEach(input => {
+                const qty = parseInt(input.value);
+                if (qty > 0) rincianItem.push(`${input.getAttribute('data-name')}: ${qty}`);
+            });
+
+            const body = {
+                nama: document.getElementById('nama').value,
+                rank: document.getElementById('rank').value,
+                tipe: tipeVal, // Gunakan variabel tipeVal
+                subTipe: document.getElementById('subTipe').value,
+                itemDetail: rincianItem.join('\n') || '-',
+                // Jika Non Bundling, kirim teks "N/A" agar tidak kosong, jika Bundling ambil inputnya
+                jumlah: (tipeVal === 'Non Bundling') ? 'N/A' : document.getElementById('jumlah').value
+            };
+
+            try {
+                const res = await fetch('/api/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: data.message,
+                        icon: 'success',
+                        confirmButtonColor: '#5865F2',
+                        background: '#1e1e1e',
+                        color: '#fff'
+                    });
+                    document.getElementById('myForm').reset();
+                } else {
+                    Swal.fire({
+                        title: 'Oops...',
+                        text: data.message,
+                        icon: 'error',
+                        confirmButtonColor: '#d33',
+                        background: '#1e1e1e',
+                        color: '#fff'
+                    });
+                }
+            } catch (err) {
+                Swal.fire({
+                    title: 'Error Server',
+                    text: 'Tidak dapat terhubung ke server.',
+                    icon: 'warning',
+                    background: '#1e1e1e',
+                    color: '#fff'
+                });
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Kirim';
+            }
+        };
+
+        function updateSubTipe() {
+            const tipe = document.getElementById('tipe').value;
+            const subContainer = document.getElementById('subTipeContainer');
+            const subSelect = document.getElementById('subTipe');
+            const finalContainer = document.getElementById('finalOptionsContainer');
+            const jumlahContainer = document.getElementById('jumlahContainer');
+
+            finalContainer.style.display = 'none';
+            subSelect.innerHTML = '<option value="">-- Pilih --</option>';
+
+            if (tipe === 'Bundling') {
+                subContainer.style.display = 'block';
+                jumlahContainer.style.display = 'block'; // Muncul untuk Bundling
+                document.getElementById('labelSubTipe').innerText = 'Pilih Paket Bundling';
+                const list = ['Paket A', 'Paket B', 'Paket C'];
+                list.forEach(item => subSelect.innerHTML += `<option value="${item}">${item}</option>`);
+            } else if (tipe === 'Non Bundling') {
+                subContainer.style.display = 'block';
+                jumlahContainer.style.display = 'none'; // Sembunyi untuk Non-Bundling
+                document.getElementById('labelSubTipe').innerText = 'Kategori Non-Bundling';
+                const list = ['Vest ammo weapon', 'Attachment'];
+                list.forEach(item => subSelect.innerHTML += `<option value="${item}">${item}</option>`);
+            } else {
+                subContainer.style.display = 'none';
+                jumlahContainer.style.display = 'block';
+            }
+        }
+
+        function updateFinalOptions() {
+            const subTipe = document.getElementById('subTipe').value;
+            const finalContainer = document.getElementById('finalOptionsContainer');
+            const checkList = document.getElementById('checkboxList'); // Sekarang jadi list input
+            checkList.innerHTML = '';
+
+            let items = [];
+            if (subTipe === 'Vest ammo weapon') {
+                items = ['Vest', 'Ammo', 'Weapon'];
+            } else if (subTipe === 'Attachment') {
+                items = ['Scope', 'Muzzle', 'Grip', 'Magazine'];
+            }
+
+            if (items.length > 0) {
+                finalContainer.style.display = 'block';
+                items.forEach(item => {
+                    checkList.innerHTML += `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <label style="margin:0;">${item}</label>
+                    <input type="number" class="item-qty" data-name="${item}" 
+                           placeholder="0" min="0" value="0" 
+                           style="width:70px; margin:0; padding:5px;">
+                </div>`;
+                });
+            } else {
+                finalContainer.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>
