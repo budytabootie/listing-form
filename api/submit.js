@@ -3,7 +3,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ message: "Metode tidak diizinkan" });
   }
 
-  const { nama, rank, tipe, subTipe, itemDetail, jumlah } = req.body;
+  const { nama, rank, tipe, subTipe, itemDetail } = req.body;
 
   if (!nama || !rank || !tipe) {
     return res.status(400).json({ success: false, message: "Lengkapi data Nama, Rank, dan Tipe!" });
@@ -46,9 +46,9 @@ module.exports = async (req, res) => {
   ];
 
   // Tambahkan Quantity hanya jika Bundling
-  if (tipe === "Bundling") {
-    fields.push({ name: "Quantity", value: String(jumlah), inline: true });
-  }
+  // if (tipe === "Bundling") {
+  //   fields.push({ name: "Quantity", value: String(jumlah), inline: true });
+  // }
 
   try {
     const response = await fetch(targetWebhook, {
