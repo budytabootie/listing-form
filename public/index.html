@@ -36,6 +36,9 @@
                 <label id="labelSubTipe"></label>
                 <select id="subTipe" onchange="updateFinalOptions()">
                 </select>
+                <div id="infoPaketDisplay"
+                    style="margin-top: 10px; font-size: 0.9em; color: #b9bbbe; font-style: italic; display: none; background: #2f3136; padding: 8px; border-radius: 4px; border-left: 4px solid #5865F2;">
+                </div>
             </div>
 
             <div id="finalOptionsContainer"
@@ -148,48 +151,69 @@
 
             if (tipe === 'Bundling') {
                 subContainer.style.display = 'block';
-                jumlahContainer.style.display = 'block'; // Muncul untuk Bundling
+                jumlahContainer.style.display = 'block'; // Tampilkan Quantity
                 document.getElementById('labelSubTipe').innerText = 'Pilih Paket Bundling';
                 const list = ['Paket A', 'Paket B', 'Paket C'];
                 list.forEach(item => subSelect.innerHTML += `<option value="${item}">${item}</option>`);
             } else if (tipe === 'Non Bundling') {
                 subContainer.style.display = 'block';
-                jumlahContainer.style.display = 'none'; // Sembunyi untuk Non-Bundling
+                jumlahContainer.style.display = 'none'; // SEMBUNYIKAN Quantity
                 document.getElementById('labelSubTipe').innerText = 'Kategori Non-Bundling';
                 const list = ['Vest ammo weapon', 'Attachment'];
                 list.forEach(item => subSelect.innerHTML += `<option value="${item}">${item}</option>`);
             } else {
                 subContainer.style.display = 'none';
-                jumlahContainer.style.display = 'block';
+                jumlahContainer.style.display = 'none';
             }
         }
 
         function updateFinalOptions() {
+            const tipe = document.getElementById('tipe').value;
             const subTipe = document.getElementById('subTipe').value;
             const finalContainer = document.getElementById('finalOptionsContainer');
-            const checkList = document.getElementById('checkboxList'); // Sekarang jadi list input
+            const checkList = document.getElementById('checkboxList');
+            const infoDisplay = document.getElementById('infoPaketDisplay'); // Ambil elemen info
+
+            // Reset tampilan info
+            infoDisplay.style.display = 'none';
+            infoDisplay.innerText = '';
             checkList.innerHTML = '';
+            finalContainer.style.display = 'none';
 
-            let items = [];
-            if (subTipe === 'Vest ammo weapon') {
-                items = ['Vest Merah', 'Ammo 9mm', 'Ammo .50', 'Ammo .44', 'Ammo .45', 'Weapon - Ceramic', 'Weapon - Pistol .50', 'Weapon - Micro SMG', 'Weapon - Navy Revolver', 'Weapon - KVR(Vector)'];
-            } else if (subTipe === 'Attachment') {
-                items = ['Suppressor', 'Tactical suppressor', 'Grip', 'Extd', 'Extd drum', 'Extd smg', 'Macro skop'];
+            if (tipe === 'Bundling' && subTipe !== "") {
+                // Tampilkan Info Statis di Frontend
+                const infoPaket = {
+                    "Paket A": "Isi: Vest Merah x1, Ammo 9mm x100, Ceramic x1",
+                    "Paket B": "Isi: Vest Merah x2, Ammo .50 x200, Pistol .50 x1",
+                    "Paket C": "Isi: Full Attachment Set + Weapon KVR"
+                };
+
+                if (infoPaket[subTipe]) {
+                    infoDisplay.style.display = 'block';
+                    infoDisplay.innerText = infoPaket[subTipe];
+                }
             }
+            else if (tipe === 'Non Bundling') {
+                // Logika Input Number untuk Non-Bundling (seperti kode sebelumnya)
+                let items = [];
+                if (subTipe === 'Vest ammo weapon') {
+                    items = ['Vest Merah', 'Ammo 9mm', 'Ammo .50', 'Ammo .44', 'Ammo .45', 'Weapon - Ceramic', 'Weapon - Pistol .50', 'Weapon - Micro SMG', 'Weapon - Navy Revolver', 'Weapon - KVR(Vector)'];
+                } else if (subTipe === 'Attachment') {
+                    items = ['Suppressor', 'Tactical suppressor', 'Grip', 'Extd', 'Extd drum', 'Extd smg', 'Macro skop'];
+                }
 
-            if (items.length > 0) {
-                finalContainer.style.display = 'block';
-                items.forEach(item => {
-                    checkList.innerHTML += `
+                if (items.length > 0) {
+                    finalContainer.style.display = 'block';
+                    items.forEach(item => {
+                        checkList.innerHTML += `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <label style="margin:0;">${item}</label>
                     <input type="number" class="item-qty" data-name="${item}" 
                            placeholder="0" min="0" value="0" 
                            style="width:70px; margin:0; padding:5px;">
                 </div>`;
-                });
-            } else {
-                finalContainer.style.display = 'none';
+                    });
+                }
             }
         }
     </script>

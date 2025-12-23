@@ -5,23 +5,48 @@ module.exports = async (req, res) => {
 
   const { nama, rank, tipe, subTipe, itemDetail, jumlah } = req.body;
 
-  // 1. Validasi Input Dasar
   if (!nama || !rank || !tipe) {
     return res.status(400).json({ success: false, message: "Lengkapi data Nama, Rank, dan Tipe!" });
   }
 
-  // 2. Tentukan Webhook URL berdasarkan subTipe
-  let targetWebhook = process.env.DISCORD_WEBHOOK_URL; // Default/Bundling
+  // 1. Tentukan Webhook URL & Warna
+  let targetWebhook = process.env.DISCORD_WEBHOOK_URL;
+  let embedColor = 0x00ff00; // Default Hijau (Bundling)
+  let finalDetail = itemDetail;
 
-  if (subTipe === "Vest ammo weapon") {
-    targetWebhook = process.env.WEBHOOK_VEST_AMMO;
-  } else if (subTipe === "Attachment") {
-    targetWebhook = process.env.WEBHOOK_ATTACHMENT;
+  if (tipe === "Non Bundling") {
+    if (subTipe === "Vest ammo weapon") {
+      targetWebhook = process.env.WEBHOOK_VEST_AMMO;
+      embedColor = 0xe74c3c; // Merah
+    } else if (subTipe === "Attachment") {
+      targetWebhook = process.env.WEBHOOK_ATTACHMENT;
+      embedColor = 0x3498db; // Biru
+    }
+  } else if (tipe === "Bundling") {
+    // 2. Isi Detail Statis berdasarkan Paket
+    const infoPaket = {
+      "Paket A": "Isi: Vest Merah x1, Ammo 9mm x100, Ceramic x1",
+      "Paket B": "Isi: Vest Merah x2, Ammo .50 x200, Pistol .50 x1",
+      "Paket C": "Isi: Full Attachment Set + Weapon KVR"
+    };
+    finalDetail = infoPaket[subTipe] || "Detail paket tidak ditemukan";
   }
 
-  // Cek apakah webhook tersedia
   if (!targetWebhook) {
-    return res.status(500).json({ success: false, message: "Konfigurasi Webhook server belum diatur." });
+    return res.status(500).json({ success: false, message: "Konfigurasi Webhook belum diatur." });
+  }
+
+  // 3. Susun Field (Quantity hanya muncul jika bukan Non Bundling)
+  const fields = [
+    { name: "Nama", value: nama, inline: true },
+    { name: "Rank", value: rank, inline: true },
+    { name: "Category", value: `${tipe} > ${subTipe}`, inline: true },
+    { name: "Items Detail", value: `\`\`\`${finalDetail}\`\`\``, inline: false },
+  ];
+
+  // Tambahkan Quantity hanya jika Bundling
+  if (tipe === "Bundling") {
+    fields.push({ name: "Quantity", value: String(jumlah), inline: true });
   }
 
   try {
@@ -32,14 +57,8 @@ module.exports = async (req, res) => {
         embeds: [
           {
             title: "🛒 New Listing Order",
-            color: subTipe === "Attachment" ? 0x3498db : 0xe74c3c, // Biru untuk Attachment, Merah untuk Vest
-            fields: [
-              { name: "Nama", value: nama, inline: true },
-              { name: "Rank", value: rank, inline: true },
-              { name: "Category", value: `${tipe} > ${subTipe}`, inline: true },
-              { name: "Items Detail", value: `\`\`\`${itemDetail}\`\`\``, inline: false },
-              { name: "Quantity", value: String(jumlah), inline: true },
-            ],
+            color: embedColor,
+            fields: fields,
             footer: { text: `Sent via Listing Form | Category: ${subTipe}` },
             timestamp: new Date(),
           },
@@ -48,7 +67,7 @@ module.exports = async (req, res) => {
     });
 
     if (response.ok) {
-      return res.status(200).json({ success: true, message: "Berhasil dikirim ke Channel Discord!" });
+      return res.status(200).json({ success: true, message: "Berhasil dikirim ke Discord!" });
     } else {
       return res.status(response.status).json({ success: false, message: "Gagal mengirim ke Discord." });
     }
