@@ -14,11 +14,15 @@
         <form id="myForm">
             <h3>Listing Form</h3>
 
-            <label>Nama Pengirim</label>
-            <input type="text" id="nama" placeholder="Contoh: Budi" required>
+            <label>Nama</label>
+            <div class="autocomplete-wrapper">
+                <input type="text" id="nama" placeholder="Ketik nama untuk mencari..." required autocomplete="off">
+                <div id="autocomplete-list" class="autocomplete-items"></div>
+            </div>
 
-            <label>Pilih Rank</label>
+            <label>Rank Member</label>
             <select id="rank">
+                <option value="-">-</option>
                 <option value="High Rank">High Rank</option>
                 <option value="Life Member">Life Member</option>
                 <option value="Tail Gunner">Tail Gunner</option>
@@ -70,6 +74,58 @@
         // Script otomatis update tahun di footer
         document.getElementById('year').textContent = new Date().getFullYear();
 
+        let members = [];
+        const inputNama = document.getElementById('nama');
+        const listContainer = document.getElementById('autocomplete-list');
+        const rankSelect = document.getElementById('rank');
+
+        // 1. Ambil data dari JSON
+        fetch('members.json')
+            .then(res => res.json())
+            .then(data => { members = data; })
+            .catch(err => console.error("Gagal memuat data member:", err));
+
+        // 2. Logika Pencarian Nama
+        inputNama.addEventListener('input', function () {
+            const val = this.value;
+            listContainer.innerHTML = '';
+
+            // Jika input kosong, buka kembali kunci rank
+            if (!val) {
+                rankSelect.disabled = false;
+                rankSelect.value = "-";
+                return false;
+            }
+
+            const matches = members.filter(m => m.nama.toLowerCase().includes(val.toLowerCase()));
+
+            matches.forEach(match => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.innerHTML = `<strong>${match.nama.substr(0, val.length)}</strong>${match.nama.substr(val.length)}`;
+
+                item.addEventListener('click', function () {
+                    inputNama.value = match.nama;
+                    listContainer.innerHTML = '';
+
+                    // 3. Logika Auto-fill & Lock Rank
+                    if (match.rank !== "-") {
+                        rankSelect.value = match.rank;
+                        rankSelect.disabled = true; // Kunci rank
+                    } else {
+                        rankSelect.value = "-";
+                        rankSelect.disabled = false; // Buka jika rank tidak terdaftar
+                    }
+                });
+                listContainer.appendChild(item);
+            });
+        });
+
+        // Tutup list jika klik di luar
+        document.addEventListener('click', function (e) {
+            if (e.target !== inputNama) listContainer.innerHTML = '';
+        });
+
         document.getElementById('myForm').onsubmit = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('submitBtn');
@@ -88,8 +144,8 @@
 
             const body = {
                 nama: document.getElementById('nama').value,
-                rank: document.getElementById('rank').value,
-                tipe: tipeVal, // Gunakan variabel tipeVal
+                rank: document.getElementById('rank').value, // Ini tetap akan mengambil nilai meski disabled
+                tipe: tipeVal,
                 subTipe: document.getElementById('subTipe').value,
                 itemDetail: rincianItem.join('\n') || '-',
                 // Jika Non Bundling, kirim teks "N/A" agar tidak kosong, jika Bundling ambil inputnya
@@ -195,7 +251,7 @@
                 }
             }
             else if (tipe === 'Non Bundling') {
-                
+
                 let items = [];
                 if (subTipe === 'Vest ammo weapon') {
                     items = ['Vest Merah', 'Ammo 9mm', 'Ammo .50', 'Ammo .44', 'Ammo .45', 'Weapon - Ceramic', 'Weapon - Pistol .50', 'Weapon - Micro SMG', 'Weapon - Navy Revolver', 'Weapon - KVR(Vector)'];
