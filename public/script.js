@@ -121,10 +121,16 @@ window.updateFinalOptions = function () {
   const checkList = document.getElementById("checkboxList");
   const infoDisplay = document.getElementById("infoPaketDisplay");
 
-  infoDisplay.style.display = "none";
+  // Reset tampilan awal
+  if (infoDisplay) {
+    infoDisplay.style.display = "none";
+    infoDisplay.innerText = "";
+  }
+  
   checkList.innerHTML = "";
   finalContainer.style.display = "none";
 
+  // LOGIKA BUNDLING
   if (tipe === "Bundling" && subTipe !== "") {
     const infoPaket = {
       "Paket A": "Isi: Vest Merah x5 , Ammo 9mm x5 BOX | PRICE : $21.000",
@@ -132,44 +138,39 @@ window.updateFinalOptions = function () {
       "Paket C": "Isi: Vest Merah x15, Ammo 9mm x15 BOX | PRICE : $58.000",
       "Paket D": "Isi: Vest Merah x20, Ammo 9mm x20 BOX | PRICE : $74.000",
     };
-    if (infoPaket[subTipe]) {
+    
+    if (infoPaket[subTipe] && infoDisplay) {
       infoDisplay.style.display = "block";
       infoDisplay.innerText = infoPaket[subTipe];
     }
-  } else if (tipe === "Non Bundling") {
+  } 
+  
+  // LOGIKA NON BUNDLING (Sekarang akan muncul karena error di atas sudah hilang)
+  else if (tipe === "Non Bundling") {
     let items = [];
     if (subTipe === "Vest ammo weapon") {
       items = [
-        "Vest Merah",
-        "Ammo 9mm",
-        "Ammo .50",
-        "Ammo .44",
-        "Ammo .45",
-        "Weapon - Ceramic",
-        "Weapon - Pistol .50",
-        "Weapon - Micro SMG",
-        "Weapon - Navy Revolver",
-        "Weapon - KVR(Vector)",
+        "Vest Merah", "Ammo 9mm", "Ammo .50", "Ammo .44", "Ammo .45",
+        "Weapon - Ceramic", "Weapon - Pistol .50", "Weapon - Micro SMG",
+        "Weapon - Navy Revolver", "Weapon - KVR(Vector)",
       ];
     } else if (subTipe === "Attachment") {
       items = [
-        "Suppressor",
-        "Tactical suppressor",
-        "Grip",
-        "Extd",
-        "Extd drum",
-        "Extd smg",
-        "Macro skop",
+        "Suppressor", "Tactical suppressor", "Grip", "Extd",
+        "Extd drum", "Extd smg", "Macro skop",
       ];
     }
+
     if (items.length > 0) {
       finalContainer.style.display = "block";
       items.forEach((item) => {
         checkList.innerHTML += `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <label style="margin:0;">${item}</label>
-                    <input type="number" class="item-qty" data-name="${item}" placeholder="0" min="0" value="0" style="width:70px; margin:0; padding:5px;">
-                </div>`;
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <label style="margin:0; font-size: 0.9em;">${item}</label>
+              <input type="number" class="item-qty" data-name="${item}" 
+                     placeholder="0" min="0" value="0" 
+                     style="width:80px; margin:0; padding:5px; background:#1e1e1e; border:1px solid #333; color:white;">
+          </div>`;
       });
     }
   }

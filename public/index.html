@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <title>Nakama MC - Portal</title>
@@ -7,18 +8,23 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
-<body style="display: block;"> <nav style="background: #202225; height: 60px; display: flex; align-items: center; padding: 0 30px; border-bottom: 2px solid #5865F2; justify-content: space-between;">
+
+<body style="display: block;">
+    <nav
+        style="background: #202225; height: 60px; display: flex; align-items: center; padding: 0 30px; border-bottom: 2px solid #5865F2; justify-content: space-between;">
         <span style="font-weight: bold; color: #5865F2; letter-spacing: 1px;">NAKAMA PORTAL</span>
         <div style="display: flex; align-items: center; gap: 20px;">
             <span id="userNameDisplay" style="font-size: 0.85rem; color: #b9bbbe;">User</span>
-            <button onclick="logout()" style="background: #ed4245; padding: 5px 15px; width: auto; margin: 0; font-size: 0.8rem;">Logout</button>
+            <button onclick="logout()"
+                style="background: #ed4245; padding: 5px 15px; width: auto; margin: 0; font-size: 0.8rem;">Logout</button>
         </div>
     </nav>
 
     <div class="content-container" style="padding-top: 50px;">
         <form id="myForm">
             <h3>Internal Listing</h3>
-            <p style="text-align: center; font-size: 0.8rem; color: #b9bbbe; margin-bottom: 20px;">Silakan buat laporan listing Anda.</p>
+            <p style="text-align: center; font-size: 0.8rem; color: #b9bbbe; margin-bottom: 20px;">Silakan buat laporan
+                listing Anda.</p>
 
             <label>Nama Member</label>
             <div class="autocomplete-wrapper">
@@ -45,6 +51,10 @@
             <div id="subTipeContainer" style="display:none;">
                 <label id="labelSubTipe"></label>
                 <select id="subTipe" onchange="updateFinalOptions()"></select>
+
+                <div id="infoPaketDisplay"
+                    style="display:none; margin-top: 15px; font-size: 0.85rem; color: #b9bbbe; background: #23272a; padding: 10px; border-left: 4px solid #5865F2;">
+                </div>
             </div>
 
             <div id="finalOptionsContainer" style="display:none;">
@@ -57,7 +67,7 @@
 
     <script>
         const userData = JSON.parse(sessionStorage.getItem('userData'));
-        if(!userData) window.location.href = 'login.html';
+        if (!userData) window.location.href = 'login.html';
         document.getElementById('userNameDisplay').innerText = userData.nama_lengkap;
 
         function logout() {
@@ -68,4 +78,5 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
+
 </html>
