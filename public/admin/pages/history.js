@@ -1,5 +1,6 @@
 /** @param {any} supabase */
 export const HistoryPage = {
+  // ... (render() tetap sama)
   render: () => `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
             <h2>Riwayat & Persetujuan Listing</h2>
@@ -8,7 +9,6 @@ export const HistoryPage = {
                 <div id="totalRevenue" style="color:#43b581; font-weight:bold; font-size:1.2rem;">$0</div>
             </div>
         </div>
-
         <div style="background: #2f3136; border-radius: 8px; overflow: hidden; border: 1px solid #40444b;">
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
@@ -37,7 +37,6 @@ export const HistoryPage = {
 
       if (error) return console.error(error);
 
-      // Hitung Omzet Approved
       const revenue = data
         .filter((h) => h.status === "Approved")
         .reduce(
@@ -49,8 +48,7 @@ export const HistoryPage = {
 
       tableBody.innerHTML = data
         .map((h) => {
-          // Logika Warna Status
-          let statusColor = "#faa61a"; // Pending
+          let statusColor = "#faa61a";
           if (h.status === "Approved") statusColor = "#43b581";
           if (h.status === "Rejected") statusColor = "#ed4245";
 
@@ -97,49 +95,86 @@ export const HistoryPage = {
                         : `<small style="color:#72767d;">SELESAI</small>`
                     }
                 </td>
-            </tr>
-        `;
+            </tr>`;
         })
         .join("");
 
-      // Listener Button Approve
       document.querySelectorAll(".btn-approve").forEach((btn) => {
-        btn.onclick = () => updateStatus(btn.dataset.id, "Approved");
+        btn.onclick = () =>
+          updateStatus(
+            data.find((x) => x.id == btn.dataset.id),
+            "Approved"
+          );
       });
-
-      // Listener Button Reject
       document.querySelectorAll(".btn-reject").forEach((btn) => {
-        btn.onclick = () => updateStatus(btn.dataset.id, "Rejected");
+        btn.onclick = () =>
+          updateStatus(
+            data.find((x) => x.id == btn.dataset.id),
+            "Rejected"
+          );
       });
     };
 
-    const updateStatus = async (id, status) => {
-      const color = status === "Approved" ? "#43b581" : "#ed4245";
-      const text =
-        status === "Approved"
-          ? "Stok akan otomatis terpotong!"
-          : "Laporan ini akan dibatalkan.";
-
+    const updateStatus = async (record, status) => {
       const { isConfirmed } = await Swal.fire({
         title: `Konfirmasi ${status}?`,
-        text: text,
+        text:
+          status === "Approved"
+            ? "Sistem akan mencoba memotong stok dan assign SN Weapon."
+            : "Laporan akan ditolak.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: color,
+        confirmButtonColor: status === "Approved" ? "#43b581" : "#ed4245",
         background: "#2f3136",
         color: "#fff",
       });
 
       if (isConfirmed) {
+        // --- LOGIKA AUTO ASSIGN WEAPON ---
+        if (status === "Approved") {
+          // 1. Ambil list nama senjata dari katalog (jenis weapon)
+          const { data: weaponsKatalog } = await supabase
+            .from("katalog_barang")
+            .select("nama_barang")
+            .eq("jenis_barang", "Weapon");
+          const weaponNames = weaponsKatalog.map((w) => w.nama_barang);
+
+          // 2. Cek apakah ada nama senjata di dalam item_detail
+          for (const wName of weaponNames) {
+            if (record.item_detail.includes(wName)) {
+              // 3. Cari 1 SN yang tersedia untuk senjata tersebut
+              const { data: availWeap } = await supabase
+                .from("inventory_weapons")
+                .select("id, serial_number")
+                .eq("weapon_name", wName)
+                .is("hold_by", null)
+                .limit(1)
+                .single();
+
+              if (availWeap) {
+                // 4. Assign nama member ke kolom hold_by
+                await supabase
+                  .from("inventory_weapons")
+                  .update({ hold_by: record.nama_member })
+                  .eq("id", availWeap.id);
+
+                console.log(
+                  `Weapon ${wName} (${availWeap.serial_number}) assigned to ${record.nama_member}`
+                );
+              }
+            }
+          }
+        }
+
         const { error } = await supabase
           .from("history_listing")
           .update({ status: status })
-          .eq("id", id);
+          .eq("id", record.id);
 
         if (!error) {
           Swal.fire({
             icon: "success",
-            title: `Status: ${status}`,
+            title: `Berhasil ${status}`,
             timer: 1000,
             showConfirmButton: false,
           });

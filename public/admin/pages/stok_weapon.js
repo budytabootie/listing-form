@@ -22,7 +22,7 @@ export const StokWeaponPage = {
                     <tr style="background: #202225; text-align: left;">
                         <th style="padding: 15px;">Nama Senjata</th>
                         <th style="padding: 15px;">Serial Number</th>
-                        <th style="padding: 15px;">Status</th>
+                        <th style="padding: 15px;">Status / Hold By</th> 
                         <th style="padding: 15px; text-align: center;">Aksi</th>
                     </tr>
                 </thead>
@@ -60,10 +60,9 @@ export const StokWeaponPage = {
       const summaryDiv = document.getElementById("weaponSummary");
 
       if (data) {
-        /** @type {Record<string, number>} */
         const summary = {};
         data.forEach((w) => {
-          if (w.status === "Tersedia") {
+          if (!w.hold_by) {
             summary[w.weapon_name] = (summary[w.weapon_name] || 0) + 1;
           }
         });
@@ -71,41 +70,35 @@ export const StokWeaponPage = {
         if (summaryDiv) {
           summaryDiv.innerHTML = Object.entries(summary)
             .map(
-              ([name, qty]) => `
-                <div style="background:#5865F2; padding:10px 15px; border-radius:5px; font-size:0.8rem;">
-                    <b>${name}</b>: ${qty} Unit
-                </div>
-            `
+              ([name, qty]) =>
+                `<div style="background:#5865F2; padding:10px 15px; border-radius:5px; font-size:0.8rem;"><b>${name}</b>: ${qty} Unit</div>`
             )
             .join("");
         }
 
         if (tableBody) {
           tableBody.innerHTML = data
-            .map(
-              (w) => `
-                <tr style="border-bottom: 1px solid #23272a;">
-                    <td style="padding: 15px;">${w.weapon_name}</td>
-                    <td style="padding: 15px;"><code>${
-                      w.serial_number
-                    }</code></td>
-                    <td style="padding: 15px;">
-                        <span class="badge ${
-                          w.status === "Tersedia" ? "user" : "admin"
-                        }">${w.status}</span>
-                    </td>
-                    <td style="padding: 15px; text-align: center;">
-                        <button class="btn-del-weapon" data-id="${
-                          w.id
-                        }" style="background:#ed4245; padding:5px 10px; width:auto;">Hapus</button>
-                    </td>
-                </tr>
-            `
-            )
+            .map((w) => {
+              const displayStatus = w.hold_by
+                ? `HOLD: ${w.hold_by}`
+                : "Tersedia";
+              const badgeClass = w.hold_by ? "admin" : "user";
+              return `
+                            <tr style="border-bottom: 1px solid #23272a;">
+                                <td style="padding: 15px;">${w.weapon_name}</td>
+                                <td style="padding: 15px;"><code>${w.serial_number}</code></td>
+                                <td style="padding: 15px;">
+                                    <span class="badge ${badgeClass}">${displayStatus}</span>
+                                </td>
+                                <td style="padding: 15px; text-align: center;">
+                                    <button class="btn-del-weapon" data-id="${w.id}" style="background:#ed4245; padding:5px 10px; width:auto;">Hapus</button>
+                                </td>
+                            </tr>`;
+            })
             .join("");
 
           document.querySelectorAll(".btn-del-weapon").forEach((btn) => {
-            btn.addEventListener("click", async () => {
+            btn.onclick = async () => {
               const id = btn.getAttribute("data-id");
               const { isConfirmed } = await Swal.fire({
                 title: "Hapus Senjata?",
@@ -119,7 +112,7 @@ export const StokWeaponPage = {
                 await supabase.from("inventory_weapons").delete().eq("id", id);
                 loadWeapons();
               }
-            });
+            };
           });
         }
       }
@@ -135,25 +128,23 @@ export const StokWeaponPage = {
           document.getElementById("weapSN")
         );
 
-        if (!nameEl || !snEl || !snEl.value || !priceEl.value) {
-          return Swal.fire(
-            "Error",
-            "Lengkapi semua data termasuk harga!",
-            "error"
-          );
+        // PERBAIKAN: Menghapus priceEl.value yang menyebabkan error
+        if (!nameEl || !snEl || !snEl.value) {
+          return Swal.fire("Error", "Lengkapi semua data!", "error");
         }
 
-        const { error } = await supabase.from("inventory_weapons").insert([
-          {
-            weapon_name: nameEl.value,
-            serial_number: snEl.value,
-          },
-        ]);
+        const { error } = await supabase
+          .from("inventory_weapons")
+          .insert([{ weapon_name: nameEl.value, serial_number: snEl.value }]);
 
-        if (error) return Swal.fire("Error", "SN sudah terdaftar!", "error");
+        if (error)
+          return Swal.fire(
+            "Error",
+            "SN sudah terdaftar atau error database!",
+            "error"
+          );
 
         snEl.value = "";
-        priceEl.value = "";
         loadWeapons();
       };
     }
