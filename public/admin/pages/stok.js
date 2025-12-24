@@ -1,7 +1,7 @@
 export const StokPage = {
   render: () => `
         <h2>Warehouse Inventory</h2>
-        <p style="color: #b9bbbe; margin-bottom: 20px;">Kelola persediaan barang dan harga satuan.</p>
+        <p style="color: #b9bbbe; margin-bottom: 20px;">Kelola persediaan barang.</p>
         
         <div style="background: #2f3136; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <h4>Update / Tambah Barang</h4>
@@ -14,10 +14,6 @@ export const StokPage = {
                     <label style="margin-top:0">Jumlah Stok</label>
                     <input type="number" id="itemQty" placeholder="0">
                 </div>
-                <div>
-                    <label style="margin-top:0">Harga Satuan ($)</label>
-                    <input type="number" id="itemPrice" placeholder="5000">
-                </div>
                 <button id="btnSaveStok" style="width: auto; margin: 0; padding: 10px 20px;">Simpan</button>
             </div>
         </div>
@@ -28,7 +24,6 @@ export const StokPage = {
                     <tr style="background: #202225; text-align: left;">
                         <th style="padding: 15px;">Nama Barang</th>
                         <th style="padding: 15px;">Tersedia</th>
-                        <th style="padding: 15px;">Harga Satuan</th>
                         <th style="padding: 15px; text-align: center;">Aksi</th>
                     </tr>
                 </thead>
@@ -80,14 +75,11 @@ export const StokPage = {
                     <td style="padding: 15px;"><span style="color: ${
                       item.stock <= 5 ? "#ed4245" : "#43b581"
                     }">${item.stock} unit</span></td>
-                    <td style="padding: 15px;">$${item.price.toLocaleString()}</td>
                     <td style="padding: 15px; text-align: center;">
                         <button class="btn-edit-stok" data-id="${
                           item.id
                         }" data-name="${item.item_name}" data-stock="${
             item.stock
-          }" data-price="${
-            item.price
           }" style="background:#5865F2; padding:5px 10px; width:auto; margin-right:5px;">Edit</button>
                         <button class="btn-delete-stok" data-id="${
                           item.id
@@ -119,7 +111,6 @@ export const StokPage = {
         btn.onclick = () => {
           selectDropdown.value = btn.dataset.name;
           document.getElementById("itemQty").value = btn.dataset.stock;
-          document.getElementById("itemPrice").value = btn.dataset.price;
           const saveBtn = document.getElementById("btnSaveStok");
           saveBtn.innerText = "Update Stok";
           saveBtn.dataset.mode = "edit";
@@ -132,23 +123,22 @@ export const StokPage = {
     document.getElementById("btnSaveStok").onclick = async () => {
       const name = selectDropdown.value; // Ambil dari dropdown
       const stock = parseInt(document.getElementById("itemQty").value);
-      const price = parseInt(document.getElementById("itemPrice").value);
       const btn = document.getElementById("btnSaveStok");
 
-      if (!name || isNaN(stock) || isNaN(price))
+      if (!name || isNaN(stock))
         return Swal.fire({ icon: "error", title: "Isi data dengan benar!" });
 
       if (btn.dataset.mode === "edit") {
         await supabase
           .from("inventory")
-          .update({ item_name: name, stock, price })
+          .update({ item_name: name, stock })
           .eq("id", btn.dataset.id);
         delete btn.dataset.mode;
         btn.innerText = "Simpan";
       } else {
         await supabase
           .from("inventory")
-          .insert([{ item_name: name, stock, price }]);
+          .insert([{ item_name: name, stock }]);
       }
 
       Swal.fire({
@@ -158,7 +148,6 @@ export const StokPage = {
         showConfirmButton: false,
       });
       document.getElementById("itemQty").value = "";
-      document.getElementById("itemPrice").value = "";
       loadStok();
     };
 
