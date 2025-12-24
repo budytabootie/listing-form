@@ -17,6 +17,7 @@ export const KatalogPage = {
                         <option value="Ammo">Ammo</option>
                         <option value="Weapon">Weapon (Serialized)</option>
                         <option value="Attachment">Attachment</option>
+                        <option value="Attachment">Narkoba</option>
                     </select>
                 </div>
                 <div>
