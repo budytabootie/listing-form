@@ -159,3 +159,23 @@ footer {
     text-align: center; padding: 20px; font-size: 0.8rem;
     color: var(--text-muted); border-top: 1px solid #2f3136;
 }
+
+/* Utility untuk halaman full-width tanpa sidebar (Login & Index User) */
+.no-sidebar {
+    display: block !important; /* Mematikan flex samping agar konten bisa di tengah */
+}
+
+.no-sidebar .container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+/* Memperbaiki posisi footer agar tetap di bawah tapi tidak menempel */
+.no-sidebar footer {
+    width: 100%;
+    position: relative;
+    margin-top: auto;
+}
