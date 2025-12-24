@@ -17,10 +17,10 @@
             </div>
 
             <label>Username</label>
-            <input type="text" id="username" placeholder="Masukkan username" required autocomplete="off">
+            <input type="text" id="username" placeholder="Masukkan username" required autocomplete="username">
 
             <label>Password</label>
-            <input type="password" id="password" placeholder="Masukkan password" required>
+            <input type="password" id="password" placeholder="Masukkan password" required autocomplete="current-password">
 
             <button type="submit" id="loginBtn">Masuk</button>
         </form>
@@ -34,17 +34,32 @@
         const loginForm = document.getElementById('loginForm');
         let _supabase;
 
-        // 1. Inisialisasi Supabase
         async function initSupabase() {
             try {
                 const response = await fetch('/api/get-config');
                 const config = await response.json();
                 _supabase = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+                
+                // Cek jika sudah login, langsung lempar ke dashboard yang sesuai
+                const session = sessionStorage.getItem('userData');
+                if (session) {
+                    const user = JSON.parse(session);
+                    redirectUser(user.role);
+                }
             } catch (err) {
                 console.error("Gagal koneksi server:", err);
             }
         }
-        initSupabase();
+
+        function redirectUser(role) {
+            const userRole = (role || 'user').toLowerCase();
+            if (userRole === 'admin' || userRole === 'superadmin') {
+                // ARAHKAN KE FOLDER ADMIN
+                window.location.href = '/admin/';
+            } else {
+                window.location.href = '/';
+            }
+        }
 
         loginForm.onsubmit = async (e) => {
             e.preventDefault();
@@ -55,7 +70,7 @@
             const btn = document.getElementById('loginBtn');
 
             btn.disabled = true;
-            btn.innerText = 'Memverifikasi...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memverifikasi...';
 
             try {
                 const { data: user, error } = await _supabase
@@ -65,43 +80,35 @@
                     .eq('password', passwordInput)
                     .single();
 
-                if (error || !user) throw new Error('Akun tidak ditemukan atau password salah.');
+                if (error || !user) throw new Error('Username atau password salah.');
 
-                // 2. Simpan ke Session
                 sessionStorage.setItem('isLoggedIn', 'true');
                 sessionStorage.setItem('userData', JSON.stringify(user));
 
-                // 3. Pengecekan Role (Gunakan toLowerCase agar aman dari typo Admin vs admin)
-                const userRole = (user.role || 'user').toLowerCase();
-
                 Swal.fire({
                     title: 'Berhasil!',
-                    text: `Selamat datang, ${user.nama_lengkap}`,
+                    text: `Selamat datang kembali, ${user.nama_lengkap}`,
                     icon: 'success',
-                    timer: 1300,
+                    timer: 1000,
                     showConfirmButton: false,
                     background: '#1e1e1e', color: '#fff'
                 }).then(() => {
-                    // 4. SATU-SATUNYA TEMPAT REDIRECT
-                    if (userRole === 'admin' || userRole === 'superadmin') {
-                        window.location.href = 'dashboard.html';
-                    } else {
-                        window.location.href = 'index.html';
-                    }
+                    redirectUser(user.role);
                 });
 
             } catch (err) {
                 Swal.fire({ 
-                    title: 'Akses Ditolak', 
+                    title: 'Gagal Login', 
                     text: err.message, 
                     icon: 'error', 
-                    background: '#1e1e1e', 
-                    color: '#fff' 
+                    background: '#1e1e1e', color: '#fff' 
                 });
                 btn.disabled = false;
                 btn.innerText = 'Masuk';
             }
         };
+
+        initSupabase();
     </script>
 </body>
 </html>

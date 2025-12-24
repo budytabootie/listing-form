@@ -179,3 +179,13 @@ footer {
     position: relative;
     margin-top: auto;
 }
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.badge.admin { background: #5865F2; color: white; }
+.badge.user { background: #4f545c; color: #dcddde; }

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <nav id="sidebar">
+        <div class="sidebar-header">
+            <span class="logo-text" style="font-weight: bold; color: #5865F2;">NAKAMA MC</span>
+            <i class="fas fa-bars" id="toggleBtn" style="cursor:pointer;"></i>
+        </div>
+        <div class="sidebar-menu">
+            <a href="#" class="menu-item active" onclick="loadPage('members')">
+                <i class="fas fa-users-cog"></i> <span>Manage Members</span>
+            </a>
+            <a href="#" class="menu-item" onclick="loadPage('katalog')">
+                <i class="fas fa-book"></i> <span>Katalog Barang</span>
+            </a>
+            <a href="#" class="menu-item" onclick="loadPage('stok')">
+                <i class="fas fa-boxes-stacked"></i> <span>Warehouse Barang</span>
+            </a>
+            <a href="#" class="menu-item" onclick="loadPage('stok_weapon')">
+                <i class="fas fa-gun"></i> <span>Warehouse Weapon</span>
+            </a>
+            <a href="#" class="menu-item" onclick="loadPage('users')">
+                <i class="fas fa-user-shield"></i> <span>User Management</span>
+            </a>
+
+            <div class="menu-item logout-item" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-wrapper" id="mainWrapper">
+        <div id="content-area" style="padding: 40px;">
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
