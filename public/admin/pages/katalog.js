@@ -1,3 +1,4 @@
+/** @param {any} supabase */
 export const KatalogPage = {
   render: () => `
         <h2>Katalog Master Barang</h2>
@@ -17,7 +18,7 @@ export const KatalogPage = {
                         <option value="Ammo">Ammo</option>
                         <option value="Weapon">Weapon (Serialized)</option>
                         <option value="Attachment">Attachment</option>
-                        <option value="Attachment">Narkoba</option>
+                        <option value="Narkoba">Narkoba</option>
                     </select>
                 </div>
                 <div>
@@ -69,19 +70,11 @@ export const KatalogPage = {
         .map(
           (item) => `
                 <tr style="border-bottom: 1px solid #23272a;">
-                    <td style="padding: 15px; font-weight:bold;">${
-                      item.nama_barang
-                    }</td>
-                    <td style="padding: 15px;"><span style="color: #b9bbbe;">${
-                      item.jenis_barang
-                    }</span></td>
-                    <td style="padding: 15px;">$${Number(
-                      item.harga_satuan || 0
-                    ).toLocaleString()}</td>
+                    <td style="padding: 15px; font-weight:bold;">${item.nama_barang}</td>
+                    <td style="padding: 15px;"><span style="color: #b9bbbe;">${item.jenis_barang}</span></td>
+                    <td style="padding: 15px;">$${Number(item.harga_satuan || 0).toLocaleString()}</td>
                     <td style="padding: 15px;">
-                        <span style="color: ${
-                          item.status === "Ready" ? "#43b581" : "#ed4245"
-                        }">
+                        <span style="color: ${item.status === "Ready" ? "#43b581" : "#ed4245"}">
                             ● ${item.status}
                         </span>
                     </td>
@@ -93,9 +86,7 @@ export const KatalogPage = {
                             data-harga="${item.harga_satuan}"
                             data-status="${item.status}"
                             style="background:#5865F2; padding:5px 10px; width:auto; margin-right:5px;">Edit</button>
-                        <button class="btn-delete-kat" data-id="${
-                          item.id
-                        }" style="background:#ed4245; padding:5px 10px; width:auto;">Hapus</button>
+                        <button class="btn-delete-kat" data-id="${item.id}" style="background:#ed4245; padding:5px 10px; width:auto;">Hapus</button>
                     </td>
                 </tr>
             `
@@ -127,10 +118,7 @@ export const KatalogPage = {
             color: "#fff",
           });
           if (isConfirmed) {
-            await supabase
-              .from("katalog_barang")
-              .delete()
-              .eq("id", btn.dataset.id);
+            await supabase.from("katalog_barang").delete().eq("id", btn.dataset.id);
             loadKatalog();
           }
         };
@@ -143,8 +131,7 @@ export const KatalogPage = {
       const harga = parseFloat(inputHarga.value) || 0;
       const status = inputStatus.value;
 
-      if (!nama)
-        return Swal.fire({ icon: "error", title: "Nama harus diisi!" });
+      if (!nama) return Swal.fire({ icon: "error", title: "Nama harus diisi!" });
 
       if (btnSave.dataset.mode === "edit") {
         await supabase
@@ -156,7 +143,10 @@ export const KatalogPage = {
             status: status,
           })
           .eq("id", btnSave.dataset.id);
+        
+        // Reset mode edit
         delete btnSave.dataset.mode;
+        delete btnSave.dataset.id;
         btnSave.innerText = "Simpan";
         document.getElementById("formTitle").innerText = "Tambah Barang Baru";
       } else {
@@ -176,8 +166,11 @@ export const KatalogPage = {
         timer: 1000,
         showConfirmButton: false,
       });
+
+      // Reset form fields
       inputNama.value = "";
       inputHarga.value = "";
+      inputJenis.selectedIndex = 0; // Kembali ke pilihan pertama
       loadKatalog();
     };
 

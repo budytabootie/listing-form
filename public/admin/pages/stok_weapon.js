@@ -43,12 +43,7 @@ export const StokWeaponPage = {
       const select = document.getElementById("weapNameSelect");
       if (select) {
         if (data && data.length > 0) {
-          select.innerHTML = data
-            .map(
-              (w) =>
-                `<option value="${w.nama_barang}">${w.nama_barang}</option>`
-            )
-            .join("");
+          select.innerHTML = data.map(w => `<option value="${w.nama_barang}">${w.nama_barang}</option>`).join("");
         } else {
           select.innerHTML = `<option value="">Tambah senjata di Katalog dulu!</option>`;
         }
@@ -64,8 +59,8 @@ export const StokWeaponPage = {
       const tableBody = document.getElementById("weaponTableBody");
       const summaryDiv = document.getElementById("weaponSummary");
 
-      if (data) {
-        // 1. Hitung Ringkasan (Hanya yang hold_by-nya kosong/tersedia)
+      if (data && tableBody) {
+        // 1. Hitung Ringkasan
         const summary = {};
         data.forEach((w) => {
           if (!w.hold_by) {
@@ -75,68 +70,74 @@ export const StokWeaponPage = {
 
         if (summaryDiv) {
           summaryDiv.innerHTML = Object.entries(summary)
-            .map(
-              ([name, qty]) => `
-                <div style="background:#5865F2; padding:10px 15px; border-radius:5px; font-size:0.8rem;">
-                    <b>${name}</b>: ${qty} Tersedia
-                </div>
-            `
-            )
+            .map(([name, qty]) => `<div style="background:#5865F2; padding:10px 15px; border-radius:5px; font-size:0.8rem;"><b>${name}</b>: ${qty} Tersedia</div>`)
             .join("");
         }
 
-        // 2. Render Tabel
-        if (tableBody) {
-          tableBody.innerHTML = data
-            .map((w) => {
-              const statusFisik = w.hold_by ? "In Use" : "Available";
-              const badgeClass = w.hold_by ? "admin" : "user";
+        // 2. Render Tabel dengan Tombol Edit
+        tableBody.innerHTML = data.map((w) => {
+          const statusFisik = w.hold_by ? "In Use" : "Available";
+          const badgeClass = w.hold_by ? "admin" : "user";
 
-              return `
-              <tr style="border-bottom: 1px solid #23272a;">
-                  <td style="padding: 15px;">${w.weapon_name}</td>
-                  <td style="padding: 15px;"><code>${
-                    w.serial_number
-                  }</code></td>
-                  <td style="padding: 15px;">
-                      <span class="badge ${badgeClass}">${statusFisik}</span>
-                  </td>
-                  <td style="padding: 15px; color: #b9bbbe;">
-                      ${
-                        w.hold_by
-                          ? `<i class="fas fa-user" style="font-size:0.7rem; color:#faa61a;"></i> ${w.hold_by}`
-                          : "-"
-                      }
-                  </td>
-                  <td style="padding: 15px; text-align: center;">
-                      <button class="btn-del-weapon" data-id="${
-                        w.id
-                      }" style="background:#ed4245; padding:5px 10px; width:auto;">Hapus</button>
-                  </td>
-              </tr>`;
-            })
-            .join("");
+          return `
+            <tr style="border-bottom: 1px solid #23272a;">
+                <td style="padding: 15px;">${w.weapon_name}</td>
+                <td style="padding: 15px;"><code>${w.serial_number}</code></td>
+                <td style="padding: 15px;"><span class="badge ${badgeClass}">${statusFisik}</span></td>
+                <td style="padding: 15px; color: #b9bbbe;">
+                    ${w.hold_by ? `<i class="fas fa-user" style="font-size:0.7rem; color:#faa61a;"></i> ${w.hold_by}` : "-"}
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <button class="btn-edit-hold" data-id="${w.id}" data-current="${w.hold_by || ""}" style="background:#faa61a; padding:5px 10px; width:auto; margin-right:5px;">Edit</button>
+                    <button class="btn-del-weapon" data-id="${w.id}" style="background:#ed4245; padding:5px 10px; width:auto;">Hapus</button>
+                </td>
+            </tr>`;
+        }).join("");
 
-          // 3. Listener Hapus
-          document.querySelectorAll(".btn-del-weapon").forEach((btn) => {
-            btn.onclick = async () => {
-              const id = btn.getAttribute("data-id");
-              const { isConfirmed } = await Swal.fire({
-                title: "Hapus Senjata?",
-                text: "Data akan hilang permanen dari gudang.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#ed4245",
-                background: "#1e1e1e",
-                color: "#fff",
-              });
-              if (isConfirmed && id) {
-                await supabase.from("inventory_weapons").delete().eq("id", id);
-                loadWeapons();
-              }
-            };
-          });
-        }
+        // 3. Listener Edit Penanggung Jawab
+        document.querySelectorAll(".btn-edit-hold").forEach((btn) => {
+          btn.onclick = async () => {
+            const id = btn.getAttribute("data-id");
+            const currentHold = btn.getAttribute("data-current");
+
+            const { value: newHold } = await Swal.fire({
+              title: "Edit Penanggung Jawab",
+              input: "text",
+              inputLabel: "Masukkan nama member (kosongkan jika kembali ke gudang)",
+              inputValue: currentHold,
+              showCancelButton: true,
+              background: "#2f3136",
+              color: "#fff",
+              confirmButtonColor: "#faa61a",
+            });
+
+            // Jika user menekan 'OK' (bukan cancel)
+            if (newHold !== undefined) {
+                const updatedName = newHold.trim() === "" ? null : newHold.trim();
+                await supabase.from("inventory_weapons").update({ hold_by: updatedName }).eq("id", id);
+                loadWeapons(); // Refresh data
+            }
+          };
+        });
+
+        // 4. Listener Hapus
+        document.querySelectorAll(".btn-del-weapon").forEach((btn) => {
+          btn.onclick = async () => {
+            const id = btn.getAttribute("data-id");
+            const { isConfirmed } = await Swal.fire({
+              title: "Hapus Senjata?",
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonColor: "#ed4245",
+              background: "#1e1e1e",
+              color: "#fff",
+            });
+            if (isConfirmed && id) {
+              await supabase.from("inventory_weapons").delete().eq("id", id);
+              loadWeapons();
+            }
+          };
+        });
       }
     };
 
@@ -145,15 +146,9 @@ export const StokWeaponPage = {
       saveBtn.onclick = async () => {
         const nameEl = document.getElementById("weapNameSelect");
         const snEl = document.getElementById("weapSN");
+        if (!nameEl || !snEl || !snEl.value) return Swal.fire("Error", "Lengkapi Serial Number!", "error");
 
-        if (!nameEl || !snEl || !snEl.value) {
-          return Swal.fire("Error", "Lengkapi Serial Number!", "error");
-        }
-
-        const { error } = await supabase
-          .from("inventory_weapons")
-          .insert([{ weapon_name: nameEl.value, serial_number: snEl.value }]);
-
+        const { error } = await supabase.from("inventory_weapons").insert([{ weapon_name: nameEl.value, serial_number: snEl.value }]);
         if (error) return Swal.fire("Error", "SN sudah terdaftar!", "error");
 
         snEl.value = "";
