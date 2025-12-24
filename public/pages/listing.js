@@ -203,75 +203,87 @@ export const ListingPage = {
       btn.disabled = true;
       btn.innerText = "Mengirim...";
 
-      const itemElements = document.querySelectorAll(".item-qty");
-      let rincianItem = [];
-      itemElements.forEach((el) => {
-        const qty = parseInt(el.value);
-        if (qty > 0) rincianItem.push(`${el.dataset.name}: ${qty}`);
-      });
+      const requests = [];
+      const namaMember = document.getElementById("nama").value;
+      const tipeLayanan = document.getElementById("tipe").value;
+      const subTipe = document.getElementById("subTipe").value;
 
-      const bodyData = {
-        nama: inputNama.value,
-        rank: rankSelect.value,
-        tipe: tipeSelect.value,
-        subTipe: subSelect.value,
-        itemDetail: rincianItem.join("\n") || "-",
-        totalHarga: totalDisplay.innerText, // Gunakan variabel yang sudah di-init
-      };
+      if (tipeLayanan === "Bundling") {
+        requests.push({
+          requested_by: namaMember,
+          item_name: subTipe,
+          item_type: "Bundling",
+          quantity: 1,
+          status: "pending",
+          total_price: document.getElementById("totalDisplay").innerText,
+        });
+      } else {
+        const itemElements = document.querySelectorAll(".item-qty");
+        itemElements.forEach((el) => {
+          const qty = parseInt(el.value);
+          if (qty > 0) {
+            // Tentukan tipe: Jika ada kata 'Ammo' atau 'Vest' tetap General,
+            // Jika mengandung senjata (logic sederhana) bisa disesuaikan
+            let type = "General";
+            const weaponKeywords = [
+              "Glock",
+              "Combat",
+              "Rifle",
+              "SMG",
+              "Shotgun",
+              "Pistol",
+            ];
+            if (weaponKeywords.some((kw) => el.dataset.name.includes(kw))) {
+              type = "Weapon";
+            }
+
+            requests.push({
+              requested_by: namaMember,
+              item_name: el.dataset.name,
+              item_type: type,
+              quantity: qty,
+              status: "pending",
+              total_price: `$${(
+                priceMap[el.dataset.name] * qty
+              ).toLocaleString()}`,
+            });
+          }
+        });
+      }
 
       try {
-        // LANGKAH 1: Simpan ke Database
-        const { error: dbError } = await supabase
-          .from("history_listing")
-          .insert([
-            {
-              nama_member: bodyData.nama,
-              rank_member: bodyData.rank,
-              tipe_layanan: `${bodyData.tipe} - ${bodyData.subTipe}`,
-              item_detail: bodyData.itemDetail,
-              total_harga: bodyData.totalHarga,
-              status: "Pending",
-            },
-          ]);
+        if (requests.length === 0)
+          throw new Error("Pilih setidaknya satu item!");
 
+        // Simpan ke tabel orders
+        const { error: dbError } = await supabase
+          .from("orders")
+          .insert(requests);
         if (dbError) throw dbError;
 
-        // LANGKAH 2: Kirim ke API Discord
-        const res = await fetch("/api/submit", {
+        // Kirim ke Discord (Gunakan bodyData lama Anda untuk format chat)
+        await fetch("/api/submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(bodyData),
+          body: JSON.stringify({
+            nama: namaMember,
+            rank: document.getElementById("rank").value,
+            tipe: tipeLayanan,
+            subTipe: subTipe,
+            itemDetail: requests
+              .map((r) => `${r.item_name} x${r.quantity}`)
+              .join("\n"),
+            totalHarga: document.getElementById("totalDisplay").innerText,
+          }),
         });
 
-        // CEK APAKAH RESPONSE OK SEBELUM JSON.PARSE
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Server Error: ${res.status}`);
-        }
-
-        const data = await res.json();
-
-        if (data.success) {
-          Swal.fire({
-            title: "Berhasil!",
-            text: "Laporan telah disimpan dan diteruskan ke Admin.",
-            icon: "success",
-            background: "#1e1e1e",
-            color: "#fff",
-          });
-
-          document.getElementById("myForm").reset();
-          subContainer.style.display = "none";
-          finalContainer.style.display = "none";
-          totalDisplay.innerText = "$0";
-        }
+        Swal.fire("Berhasil!", "Pesanan dikirim ke Admin.", "success");
+        document.getElementById("myForm").reset();
+        document.getElementById("subTipeContainer").style.display = "none";
+        document.getElementById("finalOptionsContainer").style.display = "none";
+        document.getElementById("totalDisplay").innerText = "$0";
       } catch (err) {
-        console.error("Submit Error:", err);
-        Swal.fire({
-          title: "Error",
-          text: err.message || "Terjadi kesalahan saat mengirim data.",
-          icon: "error",
-        });
+        Swal.fire("Error", err.message, "error");
       } finally {
         btn.disabled = false;
         btn.innerText = "Kirim Laporan";

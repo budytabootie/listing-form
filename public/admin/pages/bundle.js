@@ -17,17 +17,17 @@ export const BundlePage = {
         <div style="display: grid; grid-template-columns: 1fr 1fr 2fr auto; gap: 15px; align-items: end; margin-bottom:30px;">
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; text-transform:uppercase; font-weight:bold;">Nama Paket</label>
-                <input type="text" id="pkgName" placeholder="Contoh: Paket Hemat A" style="background:#202225; border:1px solid #000;">
+                <input type="text" id="pkgName" placeholder="Contoh: Paket Hemat A" style="background:#202225; border:1px solid #4f545c; color:white; width:100%; padding:8px; border-radius:4px;">
             </div>
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; text-transform:uppercase; font-weight:bold;">Harga ($)</label>
-                <input type="number" id="pkgPrice" placeholder="21000" style="background:#202225; border:1px solid #000;">
+                <input type="number" id="pkgPrice" placeholder="21000" style="background:#202225; border:1px solid #4f545c; color:white; width:100%; padding:8px; border-radius:4px;">
             </div>
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; text-transform:uppercase; font-weight:bold;">Deskripsi Isi</label>
-                <input type="text" id="pkgDesc" placeholder="Vest, Ammo, dll..." style="background:#202225; border:1px solid #000;">
+                <input type="text" id="pkgDesc" placeholder="Vest, Ammo, dll..." style="background:#202225; border:1px solid #4f545c; color:white; width:100%; padding:8px; border-radius:4px;">
             </div>
-            <button id="btnSavePkg" style="background:#5865F2; padding: 10px 25px; font-weight:bold; height:40px;">SIMPAN</button>
+            <button id="btnSavePkg" style="background:#5865F2; padding: 10px 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">SIMPAN</button>
         </div>
 
         <div style="height: 1px; background: linear-gradient(90deg, #5865F2, transparent); margin-bottom: 20px;"></div>
@@ -59,10 +59,10 @@ export const BundlePage = {
             <i class="fas fa-scroll" style="color:#43b581;"></i> Isi Item (Resep Potong Stok)
         </h4>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end; margin-bottom:30px;">
-            <select id="resPkg" style="background:#202225; border:1px solid #000;"></select>
-            <select id="resItem" style="background:#202225; border:1px solid #000;"></select>
-            <input type="number" id="resQty" placeholder="Qty" style="background:#202225; border:1px solid #000;">
-            <button id="btnAddRes" style="background:#43b581; padding: 10px 25px; font-weight:bold; height:40px;">TAMBAH</button>
+            <select id="resPkg" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px;"></select>
+            <select id="resItem" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px;"></select>
+            <input type="number" id="resQty" placeholder="Qty" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px;">
+            <button id="btnAddRes" style="background:#43b581; padding: 10px 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">TAMBAH</button>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -90,7 +90,6 @@ export const BundlePage = {
   init: async (supabase) => {
     const st = BundlePage.state;
 
-    // --- REUSABLE AESTHETIC PAGINATION RENDERER ---
     const renderAestheticPagination = (id, totalPages, stateObj, callback) => {
       const container = document.getElementById(id);
       if (!container) return;
@@ -103,14 +102,11 @@ export const BundlePage = {
       const baseStyle = `border:none; color:white; padding:8px 12px; margin:0 2px; border-radius:6px; cursor:pointer; font-size:0.8rem; transition:all 0.2s; display:flex; align-items:center; justify-content:center; min-width:35px;`;
       const navStyle = `background: #202225; color: #b9bbbe;`;
 
-      // Sliding Window Logic
       let start = Math.max(1, currentPage - 1);
       let end = Math.min(totalPages, start + 2);
       if (end - start < 2) start = Math.max(1, end - 2);
 
       let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f;">`;
-
-      // First & Prev
       html += `
         <button class="pg-btn" data-page="1" ${
           currentPage === 1
@@ -124,7 +120,6 @@ export const BundlePage = {
       }><i class="fas fa-chevron-left"></i></button>
       `;
 
-      // Numbers
       for (let i = start; i <= end; i++) {
         const isActive = i === currentPage;
         html += `<button class="pg-btn" data-page="${i}" style="${baseStyle} background:${
@@ -136,7 +131,6 @@ export const BundlePage = {
         }">${i}</button>`;
       }
 
-      // Next & Last
       html += `
         <button class="pg-btn" data-page="${currentPage + 1}" ${
         currentPage === totalPages
@@ -161,6 +155,11 @@ export const BundlePage = {
     };
 
     const loadAll = async () => {
+      // Pastikan elemen ada sebelum diakses (Mencegah error null)
+      const pkgBody = document.getElementById("pkgListTableBody");
+      const resBody = document.getElementById("resTableBody");
+      if (!pkgBody || !resBody) return;
+
       const { data: pkgs } = await supabase
         .from("master_paket")
         .select("*")
@@ -181,16 +180,15 @@ export const BundlePage = {
         st.paket.currentPage * st.paket.itemsPerPage
       );
 
-      const pkgBody = document.getElementById("pkgListTableBody");
       pkgBody.innerHTML = paginatedPkgs
         .map(
           (p) => `
-        <tr style="border-bottom: 1px solid #36393f; transition: background 0.2s;" onmouseover="this.style.background='#292b2f'" onmouseout="this.style.background='transparent'">
+        <tr style="border-bottom: 1px solid #36393f;">
             <td style="padding:15px; font-weight:bold; color:#fff;">${
               p.nama_paket
             }</td>
             <td style="padding:15px; color:#43b581; font-weight:bold;">$${Number(
-              p.total_harga
+              p.total_harga || 0
             ).toLocaleString()}</td>
             <td style="padding:15px; color:#b9bbbe;">${
               p.deskripsi_isi || "-"
@@ -234,14 +232,13 @@ export const BundlePage = {
         st.resep.currentPage * st.resep.itemsPerPage
       );
 
-      const resBody = document.getElementById("resTableBody");
       resBody.innerHTML = paginatedRes
         .map(
           (r) => `
-        <tr style="border-bottom: 1px solid #36393f;" onmouseover="this.style.background='#292b2f'" onmouseout="this.style.background='transparent'">
+        <tr style="border-bottom: 1px solid #36393f;">
             <td style="padding:15px; color:#fff;">${r.nama_paket}</td>
             <td style="padding:15px; color:#b9bbbe;">${r.nama_barang_stok}</td>
-            <td style="padding:15px; font-weight:bold;">${r.jumlah_potong}</td>
+            <td style="padding:15px; font-weight:bold; color:white;">${r.jumlah_potong}</td>
             <td style="padding:15px; text-align:center;">
                 <button class="btn-del-res" data-id="${r.id}" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
             </td>
@@ -256,20 +253,26 @@ export const BundlePage = {
       );
 
       // Dropdowns
-      document.getElementById("resPkg").innerHTML = (pkgs || [])
-        .filter((p) => p.is_active)
-        .map((p) => `<option value="${p.nama_paket}">${p.nama_paket}</option>`)
-        .join("");
-      document.getElementById("resItem").innerHTML = (items || [])
-        .map(
-          (i) => `<option value="${i.nama_barang}">${i.nama_barang}</option>`
-        )
-        .join("");
+      const resPkgEl = document.getElementById("resPkg");
+      const resItemEl = document.getElementById("resItem");
+      if (resPkgEl)
+        resPkgEl.innerHTML = (pkgs || [])
+          .filter((p) => p.is_active)
+          .map(
+            (p) => `<option value="${p.nama_paket}">${p.nama_paket}</option>`
+          )
+          .join("");
+      if (resItemEl)
+        resItemEl.innerHTML = (items || [])
+          .map(
+            (i) => `<option value="${i.nama_barang}">${i.nama_barang}</option>`
+          )
+          .join("");
 
-      attachEvents();
+      attachEvents(supabase, loadAll);
     };
 
-    const attachEvents = () => {
+    const attachEvents = (supabase, loadAll) => {
       document.querySelectorAll(".btn-toggle-pkg").forEach((btn) => {
         btn.onclick = async () => {
           await supabase
@@ -299,7 +302,7 @@ export const BundlePage = {
       });
     };
 
-    // Listeners
+    // Input Search Listeners
     document.getElementById("pkgSearch").oninput = (e) => {
       st.paket.searchQuery = e.target.value;
       st.paket.currentPage = 1;
@@ -311,37 +314,39 @@ export const BundlePage = {
       loadAll();
     };
 
+    // Button Listeners
     document.getElementById("btnSavePkg").onclick = async () => {
       const name = document.getElementById("pkgName").value;
       const price = parseInt(document.getElementById("pkgPrice").value);
       if (!name || !price) return Swal.fire("Error", "Lengkapi data!", "error");
-      await supabase
-        .from("master_paket")
-        .upsert({
-          nama_paket: name,
-          total_harga: price,
-          deskripsi_isi: document.getElementById("pkgDesc").value,
-          is_active: true,
-        });
+
+      await supabase.from("master_paket").upsert({
+        nama_paket: name,
+        total_harga: price,
+        deskripsi_isi: document.getElementById("pkgDesc").value,
+        is_active: true,
+      });
+
       Swal.fire("Berhasil", "Paket disimpan", "success");
       loadAll();
     };
 
     document.getElementById("btnAddRes").onclick = async () => {
       const qty = parseInt(document.getElementById("resQty").value);
-      if (!qty) return;
-      await supabase
-        .from("bundle_items")
-        .insert([
-          {
-            nama_paket: document.getElementById("resPkg").value,
-            nama_barang_stok: document.getElementById("resItem").value,
-            jumlah_potong: qty,
-          },
-        ]);
+      if (!qty) return Swal.fire("Error", "Isi Qty!", "warning");
+
+      await supabase.from("bundle_items").insert([
+        {
+          nama_paket: document.getElementById("resPkg").value,
+          nama_barang_stok: document.getElementById("resItem").value,
+          jumlah_potong: qty,
+        },
+      ]);
+
       loadAll();
     };
 
-    loadAll();
+    // Eksekusi load pertama kali
+    await loadAll();
   },
 };

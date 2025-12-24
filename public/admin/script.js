@@ -4,7 +4,8 @@ import { StokPage } from "./pages/stok.js";
 import { KatalogPage } from "./pages/katalog.js";
 import { StokWeaponPage } from "./pages/stok_weapon.js";
 import { HistoryPage } from "./pages/history.js";
-import { BundlePage } from "./pages/bundle.js"; // 1. Tambah Import
+import { BundlePage } from "./pages/bundle.js";
+import { OrdersPage } from "./pages/orders.js";
 
 console.log("BundlePage object:", BundlePage);
 
@@ -21,6 +22,9 @@ window.loadPage = (page) => {
   if (page === "members") {
     area.innerHTML = MembersPage.render();
     MembersPage.init(_supabase);
+  } else if (page === "orders") {
+    area.innerHTML = OrdersPage.render();
+    OrdersPage.init(_supabase);
   } else if (page === "katalog") {
     area.innerHTML = KatalogPage.render();
     KatalogPage.init(_supabase);
@@ -37,7 +41,6 @@ window.loadPage = (page) => {
     area.innerHTML = HistoryPage.render();
     HistoryPage.init(_supabase);
   } else if (page === "bundling") {
-    // 2. Tambah Logika Navigasi
     area.innerHTML = BundlePage.render();
     BundlePage.init(_supabase);
   }
@@ -67,7 +70,7 @@ async function init() {
   }
 
   // Load halaman pertama kali
-  window.loadPage("members");
+  window.loadPage("orders");
 }
 
 window.logout = () => {
