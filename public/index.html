@@ -1,22 +1,28 @@
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
     <meta charset="UTF-8">
-    <title>Listing Form</title>
+    <title>Nakama MC - Portal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
+<body style="display: block;"> <nav style="background: #202225; height: 60px; display: flex; align-items: center; padding: 0 30px; border-bottom: 2px solid #5865F2; justify-content: space-between;">
+        <span style="font-weight: bold; color: #5865F2; letter-spacing: 1px;">NAKAMA PORTAL</span>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <span id="userNameDisplay" style="font-size: 0.85rem; color: #b9bbbe;">User</span>
+            <button onclick="logout()" style="background: #ed4245; padding: 5px 15px; width: auto; margin: 0; font-size: 0.8rem;">Logout</button>
+        </div>
+    </nav>
 
-<body>
-    <div class="container">
+    <div class="content-container" style="padding-top: 50px;">
         <form id="myForm">
-            <h3>Listing Form</h3>
+            <h3>Internal Listing</h3>
+            <p style="text-align: center; font-size: 0.8rem; color: #b9bbbe; margin-bottom: 20px;">Silakan buat laporan listing Anda.</p>
 
-            <label>Nama</label>
+            <label>Nama Member</label>
             <div class="autocomplete-wrapper">
-                <input type="text" id="nama" placeholder="Ketik nama untuk mencari..." required autocomplete="off">
+                <input type="text" id="nama" placeholder="Cari nama..." required autocomplete="off">
                 <div id="autocomplete-list" class="autocomplete-items"></div>
             </div>
 
@@ -38,30 +44,28 @@
 
             <div id="subTipeContainer" style="display:none;">
                 <label id="labelSubTipe"></label>
-                <select id="subTipe" onchange="updateFinalOptions()">
-                </select>
-                <div id="infoPaketDisplay"
-                    style="margin-top: 10px; font-size: 0.9em; color: #b9bbbe; font-style: italic; display: none; background: #2f3136; padding: 8px; border-radius: 4px; border-left: 4px solid #5865F2;">
-                </div>
+                <select id="subTipe" onchange="updateFinalOptions()"></select>
             </div>
 
-            <div id="finalOptionsContainer"
-                style="display:none; background: #2c2f33; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                <label>Pilih Item (Bisa pilih beberapa):</label>
+            <div id="finalOptionsContainer" style="display:none;">
                 <div id="checkboxList"></div>
             </div>
 
-            <button type="submit" id="submitBtn">Kirim</button>
+            <button type="submit" id="submitBtn">Kirim Laporan</button>
         </form>
     </div>
 
-    <footer>
-        <p>&copy; <span id="year"></span> <b>ListingForm</b>. All Rights Reserved.</p>
-        <p>Created with ❤️ by <a href="https://discord.gg/XaEeRXkN4G" target="_blank" class="footer-link"><b>Nakama
-                    MC</b></a></p>
-    </footer>
+    <script>
+        const userData = JSON.parse(sessionStorage.getItem('userData'));
+        if(!userData) window.location.href = 'login.html';
+        document.getElementById('userNameDisplay').innerText = userData.nama_lengkap;
 
+        function logout() {
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
-
 </html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Nakama MC</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <div class="container">
+        <form id="loginForm">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #5865F2;">Nakama MC</h2>
+                <p style="color: #b9bbbe; font-size: 0.9em;">Internal Listing System</p>
+            </div>
+
+            <label>Username</label>
+            <input type="text" id="username" placeholder="Masukkan username" required autocomplete="off">
+
+            <label>Password</label>
+            <input type="password" id="password" placeholder="Masukkan password" required>
+
+            <button type="submit" id="loginBtn">Masuk</button>
+
+            <p id="loginStatus"
+                style="text-align: center; margin-top: 15px; font-size: 0.8em; color: #ff4747; display: none;">
+                Login Gagal! Cek kembali akun anda.
+            </p>
+        </form>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 <b>Nakama MC</b>. All Rights Reserved.</p>
+    </footer>
+
+    <script src="config.js"></script>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        let _supabase;
+
+        async function initSupabase() {
+            try {
+                const response = await fetch('/api/get-config');
+                const config = await response.json();
+                _supabase = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+            } catch (err) {
+                console.error("Gagal inisialisasi:", err);
+            }
+        }
+        initSupabase();
+
+        loginForm.onsubmit = async (e) => {
+            e.preventDefault();
+            if (!_supabase) return;
+
+            const usernameInput = document.getElementById('username').value;
+            const passwordInput = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+
+            btn.disabled = true;
+            btn.innerText = 'Verifikasi...';
+
+            try {
+                const { data: user, error } = await _supabase
+                    .from('users_login')
+                    .select('*')
+                    .eq('username', usernameInput)
+                    .eq('password', passwordInput)
+                    .single();
+
+                if (error || !user) throw new Error('Username atau Password salah!');
+
+                console.log("Data User dari DB:", user); // Cek apakah role-nya benar 'admin'
+                console.log("Role yang terbaca:", user.role);
+
+                // Simpan Data ke Session
+                sessionStorage.setItem('isLoggedIn', 'true');
+                sessionStorage.setItem('userData', JSON.stringify(user));
+
+                Swal.fire({
+                    title: 'Berhasil!',
+                    text: 'Selamat datang, ' + user.nama_lengkap,
+                    icon: 'success',
+                    timer: 1300,
+                    showConfirmButton: false,
+                    background: '#1e1e1e', color: '#fff'
+                }).then(() => {
+                    // REDIRECT BERDASARKAN ROLE
+                    if (user.role === 'admin' || user.role === 'superadmin') {
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        window.location.href = 'index.html';
+                    }
+                });
+
+            } catch (err) {
+                Swal.fire({ title: 'Akses Ditolak', text: err.message, icon: 'error', background: '#1e1e1e', color: '#fff' });
+                btn.disabled = false;
+                btn.innerText = 'Masuk';
+            }
+        };
+    </script>
+</body>
+
+</html>
