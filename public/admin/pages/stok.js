@@ -1,52 +1,80 @@
+/** @param {any} supabase */
 export const StokPage = {
-  render: () => `
-        <h2>Warehouse Inventory</h2>
-        <p style="color: #b9bbbe; margin-bottom: 20px;">Kelola persediaan barang.</p>
-        
-        <div style="background: #2f3136; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h4>Update / Tambah Barang</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; margin-top: 10px; align-items: end;">
-                <div>
-                    <label style="margin-top:0">Pilih Barang (Katalog)</label>
-                    <select id="itemNameSelection"></select>
-                </div>
-                <div>
-                    <label style="margin-top:0">Jumlah Stok</label>
-                    <input type="number" id="itemQty" placeholder="0">
-                </div>
-                <button id="btnSaveStok" style="width: auto; margin: 0; padding: 10px 20px;">Simpan</button>
-            </div>
-        </div>
+  state: {
+    searchQuery: "",
+    currentPage: 1,
+    itemsPerPage: 10,
+    sortField: "item_name",
+    sortAsc: true,
+  },
 
-        <div style="background: #2f3136; border-radius: 8px; overflow: hidden;">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background: #202225; text-align: left;">
-                        <th style="padding: 15px;">Nama Barang</th>
-                        <th style="padding: 15px;">Tersedia</th>
-                        <th style="padding: 15px; text-align: center;">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="stokTableBody">
-                    <tr><td colspan="4" style="text-align:center; padding:20px; color:#b9bbbe;">Memuat data...</td></tr>
-                </tbody>
-            </table>
+  render: () => `
+    <div class="header-container">
+        <h2>Warehouse Inventory</h2>
+    </div>
+
+    <div id="invStats" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px;"></div>
+
+    <div style="background: #2f3136; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); border-top: 4px solid #43b581;">
+        <h4 id="formTitle" style="margin-top:0; color:#fff;">Update / Tambah Barang</h4>
+        <div style="display: grid; grid-template-columns: 2fr 1.5fr auto; gap: 15px; align-items: end;">
+            <div>
+                <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">PILIH BARANG (KATALOG)</label>
+                <select id="itemNameSelection" style="background:#202225; border:1px solid #4f545c; height:42px;"></select>
+            </div>
+            <div>
+                <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">JUMLAH STOK</label>
+                <input type="number" id="itemQty" placeholder="0" style="background:#202225; border:1px solid #4f545c; height:42px;">
+            </div>
+            <button id="btnSaveStok" style="background:#43b581; padding: 0 30px; font-weight:bold; height:42px;">SIMPAN</button>
         </div>
-    `,
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 15px;">
+         <div style="position:relative; flex: 1;">
+            <i class="fas fa-search" style="position:absolute; left:15px; top:12px; color:#4f545c;"></i>
+            <input type="text" id="invSearch" placeholder="Cari nama barang..." 
+                style="width: 100%; padding: 10px 10px 10px 40px; background:#202225; color:white; border-radius:8px; border:1px solid #4f545c;">
+         </div>
+         <select id="invFilterStock" style="width: 200px; background:#202225; border:1px solid #4f545c; border-radius:8px;">
+            <option value="all">Semua Stok</option>
+            <option value="low">Stok Menipis (<=5)</option>
+            <option value="healthy">Stok Aman (>5)</option>
+         </select>
+    </div>
+
+    <div style="background: #2f3136; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <table style="width: 100%; border-collapse: collapse; font-size:0.9rem;">
+            <thead>
+                <tr style="background: #202225; text-align: left; color:#b9bbbe;">
+                    <th style="padding: 18px; cursor:pointer;" id="sortItemName">NAMA ITEM <i class="fas fa-sort"></i></th>
+                    <th style="padding: 18px; cursor:pointer;" id="sortItemQty">JUMLAH <i class="fas fa-sort"></i></th>
+                    <th style="padding: 18px;">STATUS</th>
+                    <th style="padding: 18px; text-align: center;">AKSI</th>
+                </tr>
+            </thead>
+            <tbody id="stokTableBody"></tbody>
+        </table>
+    </div>
+
+    <div id="stokPagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 25px; align-items: center;"></div>
+  `,
+
   init: async (supabase) => {
+    const st = StokPage.state;
     const selectDropdown = document.getElementById("itemNameSelection");
     const tableBody = document.getElementById("stokTableBody");
+    const btnSave = document.getElementById("btnSaveStok");
+    const inputQty = document.getElementById("itemQty");
 
-    // 1. Load Katalog ke Dropdown
     const loadKatalogDropdown = async () => {
-      const { data: katalog } = await supabase
+      const { data } = await supabase
         .from("katalog_barang")
         .select("nama_barang")
-        .neq("jenis_barang", "Weapon") // Ini kuncinya: Not Equal to Weapon
+        .neq("jenis_barang", "Weapon")
         .order("nama_barang");
-
       if (selectDropdown) {
-        selectDropdown.innerHTML = (katalog || [])
+        selectDropdown.innerHTML = (data || [])
           .map(
             (k) => `<option value="${k.nama_barang}">${k.nama_barang}</option>`
           )
@@ -55,49 +83,116 @@ export const StokPage = {
     };
 
     const loadStok = async () => {
-      const { data, error } = await supabase
-        .from("inventory")
-        .select("*")
-        .order("item_name");
-      if (error) return console.error(error);
-      if (data.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#b9bbbe;">Belum ada data barang.</td></tr>`;
-        return;
-      }
+      const { data, error } = await supabase.from("inventory").select("*");
+      if (error) return;
 
-      tableBody.innerHTML = data
+      // 1. Filtering
+      let filtered = data.filter((i) => {
+        const matchesSearch = i.item_name
+          .toLowerCase()
+          .includes(st.searchQuery.toLowerCase());
+        const filterVal = document.getElementById("invFilterStock").value;
+        const matchesFilter =
+          filterVal === "all"
+            ? true
+            : filterVal === "low"
+            ? i.stock <= 5
+            : i.stock > 5;
+        return matchesSearch && matchesFilter;
+      });
+
+      // 2. Sorting
+      filtered.sort((a, b) => {
+        let valA = a[st.sortField];
+        let valB = b[st.sortField];
+        if (typeof valA === "string") {
+          valA = valA.toLowerCase();
+          valB = valB.toLowerCase();
+        }
+        if (valA < valB) return st.sortAsc ? -1 : 1;
+        if (valA > valB) return st.sortAsc ? 1 : -1;
+        return 0;
+      });
+
+      // 3. Pagination
+      const totalPages = Math.ceil(filtered.length / st.itemsPerPage) || 1;
+      const paginated = filtered.slice(
+        (st.currentPage - 1) * st.itemsPerPage,
+        st.currentPage * st.itemsPerPage
+      );
+
+      renderStats(data);
+      renderTable(paginated);
+      renderPagination(totalPages);
+    };
+
+    const renderStats = (data) => {
+      const low = data.filter((i) => i.stock <= 5).length;
+      document.getElementById("invStats").innerHTML = `
+            <div style="background:#23272a; padding:15px; border-radius:10px; border-bottom:3px solid #5865F2;">
+                <div style="font-size:0.7rem; color:#b9bbbe; text-transform:uppercase;">Total Jenis Barang</div>
+                <div style="font-size:1.5rem; font-weight:bold;">${
+                  data.length
+                }</div>
+            </div>
+            <div style="background:#23272a; padding:15px; border-radius:10px; border-bottom:3px solid ${
+              low > 0 ? "#ed4245" : "#43b581"
+            };">
+                <div style="font-size:0.7rem; color:#b9bbbe; text-transform:uppercase;">Stok Kritis (<=5)</div>
+                <div style="font-size:1.5rem; font-weight:bold; color:${
+                  low > 0 ? "#ed4245" : "#fff"
+                };">${low}</div>
+            </div>
+        `;
+    };
+
+    const renderTable = (items) => {
+      tableBody.innerHTML = items
         .map(
           (item) => `
-                <tr style="border-bottom: 1px solid #23272a;">
-                    <td style="padding: 15px; font-weight:bold;">${
-                      item.item_name
-                    }</td>
-                    <td style="padding: 15px;"><span style="color: ${
-                      item.stock <= 5 ? "#ed4245" : "#43b581"
-                    }">${item.stock} unit</span></td>
-                    <td style="padding: 15px; text-align: center;">
-                        <button class="btn-edit-stok" data-id="${
-                          item.id
-                        }" data-name="${item.item_name}" data-stock="${
+        <tr style="border-bottom: 1px solid #36393f; transition:0.2s;" onmouseover="this.style.background='#36393f'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 15px; font-weight:bold; color:#fff;">${
+              item.item_name
+            }</td>
+            <td style="padding: 15px; font-weight:bold; font-size:1.1rem; color:${
+              item.stock <= 5 ? "#ed4245" : "#43b581"
+            };">${
             item.stock
-          }" style="background:#5865F2; padding:5px 10px; width:auto; margin-right:5px;">Edit</button>
-                        <button class="btn-delete-stok" data-id="${
-                          item.id
-                        }" style="background:#ed4245; padding:5px 10px; width:auto;">Hapus</button>
-                    </td>
-                </tr>
-            `
+          } <span style="font-size:0.8rem; color:#4f545c;">unit</span></td>
+            <td style="padding: 15px;">
+                <span style="background:${
+                  item.stock <= 5
+                    ? "rgba(237,66,69,0.1)"
+                    : "rgba(67,181,129,0.1)"
+                }; color:${
+            item.stock <= 5 ? "#ed4245" : "#43b581"
+          }; padding:4px 10px; border-radius:4px; font-size:0.7rem; font-weight:bold; border:1px solid currentColor;">
+                    ${item.stock <= 5 ? "LOW" : "STABLE"}
+                </span>
+            </td>
+            <td style="padding: 15px; text-align: center;">
+                <button class="btn-edit-stok" data-id="${item.id}" data-name="${
+            item.item_name
+          }" data-stock="${
+            item.stock
+          }" style="background:#5865F2; padding:6px 12px; margin-right:5px;"><i class="fas fa-edit"></i></button>
+                <button class="btn-delete-stok" data-id="${
+                  item.id
+                }" style="background:#ed4245; padding:6px 12px;"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>`
         )
         .join("");
 
-      document.querySelectorAll(".btn-delete-stok").forEach((btn) => {
+      // Bind Listeners (Delete & Edit)
+      tableBody.querySelectorAll(".btn-delete-stok").forEach((btn) => {
         btn.onclick = async () => {
           const { isConfirmed } = await Swal.fire({
-            title: "Hapus Barang?",
+            title: "Hapus?",
             icon: "warning",
             showCancelButton: true,
             confirmButtonColor: "#ed4245",
-            background: "#1e1e1e",
+            background: "#2f3136",
             color: "#fff",
           });
           if (isConfirmed) {
@@ -107,47 +202,115 @@ export const StokPage = {
         };
       });
 
-      document.querySelectorAll(".btn-edit-stok").forEach((btn) => {
+      tableBody.querySelectorAll(".btn-edit-stok").forEach((btn) => {
         btn.onclick = () => {
           selectDropdown.value = btn.dataset.name;
-          document.getElementById("itemQty").value = btn.dataset.stock;
-          const saveBtn = document.getElementById("btnSaveStok");
-          saveBtn.innerText = "Update Stok";
-          saveBtn.dataset.mode = "edit";
-          saveBtn.dataset.id = btn.dataset.id;
+          inputQty.value = btn.dataset.stock;
+          btnSave.innerText = "UPDATE";
+          btnSave.style.background = "#faa61a";
+          btnSave.dataset.mode = "edit";
+          btnSave.dataset.id = btn.dataset.id;
           window.scrollTo({ top: 0, behavior: "smooth" });
         };
       });
     };
 
-    document.getElementById("btnSaveStok").onclick = async () => {
-      const name = selectDropdown.value; // Ambil dari dropdown
-      const stock = parseInt(document.getElementById("itemQty").value);
-      const btn = document.getElementById("btnSaveStok");
+    const renderPagination = (totalPages) => {
+      const container = document.getElementById("stokPagination");
+      if (totalPages <= 1) {
+        container.innerHTML = "";
+        return;
+      }
+      const curr = st.currentPage;
+      const baseBtn = `border:none; color:white; padding:8px 12px; margin:0 2px; border-radius:6px; cursor:pointer; font-size:0.8rem; transition:0.2s; display:flex; align-items:center; min-width:35px; justify-content:center;`;
 
-      if (!name || isNaN(stock))
-        return Swal.fire({ icon: "error", title: "Isi data dengan benar!" });
+      let start = Math.max(1, curr - 1);
+      let end = Math.min(totalPages, start + 2);
+      if (end - start < 2) start = Math.max(1, end - 2);
 
-      if (btn.dataset.mode === "edit") {
+      let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f;">`;
+      html += `<button class="pg-nav" data-page="1" ${
+        curr === 1
+          ? 'disabled style="opacity:0.2;' + baseBtn + '"'
+          : 'style="' + baseBtn + 'background:#202225;"'
+      }><i class="fas fa-angles-left"></i></button>`;
+
+      for (let i = start; i <= end; i++) {
+        const active = i === curr;
+        html += `<button class="pg-nav" data-page="${i}" style="${baseBtn} background:${
+          active ? "#43b581" : "#4f545c"
+        }; ${
+          active
+            ? "box-shadow:0 4px 12px rgba(67,181,129,0.4); border:1px solid white;"
+            : ""
+        }">${i}</button>`;
+      }
+
+      html += `<button class="pg-nav" data-page="${totalPages}" ${
+        curr === totalPages
+          ? 'disabled style="opacity:0.2;' + baseBtn + '"'
+          : 'style="' + baseBtn + 'background:#202225;"'
+      }><i class="fas fa-angles-right"></i></button></div>`;
+
+      container.innerHTML = html;
+      container.querySelectorAll(".pg-nav").forEach((btn) => {
+        btn.onclick = () => {
+          st.currentPage = parseInt(btn.dataset.page);
+          loadStok();
+        };
+      });
+    };
+
+    // Event Listeners
+    document.getElementById("invSearch").oninput = (e) => {
+      st.searchQuery = e.target.value;
+      st.currentPage = 1;
+      loadStok();
+    };
+    document.getElementById("invFilterStock").onchange = () => {
+      st.currentPage = 1;
+      loadStok();
+    };
+
+    document.getElementById("sortItemName").onclick = () => {
+      st.sortField = "item_name";
+      st.sortAsc = !st.sortAsc;
+      loadStok();
+    };
+    document.getElementById("sortItemQty").onclick = () => {
+      st.sortField = "stock";
+      st.sortAsc = !st.sortAsc;
+      loadStok();
+    };
+
+    btnSave.onclick = async () => {
+      const name = selectDropdown.value;
+      const stock = parseInt(inputQty.value);
+      if (!name || isNaN(stock)) return;
+
+      if (btnSave.dataset.mode === "edit") {
         await supabase
           .from("inventory")
           .update({ item_name: name, stock })
-          .eq("id", btn.dataset.id);
-        delete btn.dataset.mode;
-        btn.innerText = "Simpan";
+          .eq("id", btnSave.dataset.id);
+        delete btnSave.dataset.mode;
+        btnSave.innerText = "SIMPAN";
+        btnSave.style.background = "#43b581";
       } else {
-        await supabase
+        const { data: existing } = await supabase
           .from("inventory")
-          .insert([{ item_name: name, stock }]);
+          .select("*")
+          .eq("item_name", name)
+          .single();
+        if (existing)
+          await supabase
+            .from("inventory")
+            .update({ stock: existing.stock + stock })
+            .eq("id", existing.id);
+        else
+          await supabase.from("inventory").insert([{ item_name: name, stock }]);
       }
-
-      Swal.fire({
-        icon: "success",
-        title: "Berhasil!",
-        timer: 1000,
-        showConfirmButton: false,
-      });
-      document.getElementById("itemQty").value = "";
+      inputQty.value = "";
       loadStok();
     };
 
