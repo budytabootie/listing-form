@@ -155,7 +155,6 @@ export const BundlePage = {
     };
 
     const loadAll = async () => {
-      // Pastikan elemen ada sebelum diakses (Mencegah error null)
       const pkgBody = document.getElementById("pkgListTableBody");
       const resBody = document.getElementById("resTableBody");
       if (!pkgBody || !resBody) return;
@@ -169,7 +168,6 @@ export const BundlePage = {
         .select("nama_barang");
       const { data: recipes } = await supabase.from("bundle_items").select("*");
 
-      // 1. Process Paket Master
       const filteredPkgs = (pkgs || []).filter((p) =>
         p.nama_paket.toLowerCase().includes(st.paket.searchQuery.toLowerCase())
       );
@@ -215,7 +213,6 @@ export const BundlePage = {
         loadAll
       );
 
-      // 2. Process Resep
       const filteredRes = (recipes || []).filter(
         (r) =>
           r.nama_paket
@@ -252,7 +249,6 @@ export const BundlePage = {
         loadAll
       );
 
-      // Dropdowns
       const resPkgEl = document.getElementById("resPkg");
       const resItemEl = document.getElementById("resItem");
       if (resPkgEl)
@@ -275,19 +271,38 @@ export const BundlePage = {
     const attachEvents = (supabase, loadAll) => {
       document.querySelectorAll(".btn-toggle-pkg").forEach((btn) => {
         btn.onclick = async () => {
-          await supabase
-            .from("master_paket")
-            .update({ is_active: btn.dataset.status !== "true" })
-            .eq("nama_paket", btn.dataset.name);
-          loadAll();
+          const action =
+            btn.dataset.status === "true" ? "Mengarsipkan" : "Mengaktifkan";
+          const { isConfirmed } = await Swal.fire({
+            title: "Konfirmasi",
+            text: `Yakin ingin ${action.toLowerCase()} paket ini?`,
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonColor: "#5865F2",
+            cancelButtonColor: "#4f545c",
+            background: "#2f3136",
+            color: "#fff",
+          });
+
+          if (isConfirmed) {
+            await supabase
+              .from("master_paket")
+              .update({ is_active: btn.dataset.status !== "true" })
+              .eq("nama_paket", btn.dataset.name);
+            loadAll();
+          }
         };
       });
+
       document.querySelectorAll(".btn-del-res").forEach((btn) => {
         btn.onclick = async () => {
           const { isConfirmed } = await Swal.fire({
             title: "Hapus Resep?",
+            text: "Item ini akan dihapus dari daftar potong stok.",
             icon: "warning",
             showCancelButton: true,
+            confirmButtonColor: "#ed4245",
+            cancelButtonColor: "#4f545c",
             background: "#2f3136",
             color: "#fff",
           });
@@ -302,7 +317,6 @@ export const BundlePage = {
       });
     };
 
-    // Input Search Listeners
     document.getElementById("pkgSearch").oninput = (e) => {
       st.paket.searchQuery = e.target.value;
       st.paket.currentPage = 1;
@@ -314,39 +328,68 @@ export const BundlePage = {
       loadAll();
     };
 
-    // Button Listeners
     document.getElementById("btnSavePkg").onclick = async () => {
-      const name = document.getElementById("pkgName").value;
+      const name = document.getElementById("pkgName").value.trim();
       const price = parseInt(document.getElementById("pkgPrice").value);
-      if (!name || !price) return Swal.fire("Error", "Lengkapi data!", "error");
+      if (!name || !price)
+        return Swal.fire("Error", "Lengkapi data nama dan harga!", "error");
 
-      await supabase.from("master_paket").upsert({
-        nama_paket: name,
-        total_harga: price,
-        deskripsi_isi: document.getElementById("pkgDesc").value,
-        is_active: true,
+      const { isConfirmed } = await Swal.fire({
+        title: "Simpan Paket?",
+        text: "Pastikan data paket master sudah benar.",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#5865F2",
+        background: "#2f3136",
+        color: "#fff",
       });
 
-      Swal.fire("Berhasil", "Paket disimpan", "success");
-      loadAll();
+      if (isConfirmed) {
+        await supabase.from("master_paket").upsert({
+          nama_paket: name,
+          total_harga: price,
+          deskripsi_isi: document.getElementById("pkgDesc").value,
+          is_active: true,
+        });
+
+        Swal.fire({
+          title: "Berhasil",
+          text: "Paket disimpan",
+          icon: "success",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        loadAll();
+      }
     };
 
     document.getElementById("btnAddRes").onclick = async () => {
       const qty = parseInt(document.getElementById("resQty").value);
-      if (!qty) return Swal.fire("Error", "Isi Qty!", "warning");
+      if (!qty || qty <= 0)
+        return Swal.fire("Error", "Isi jumlah Qty yang valid!", "warning");
 
-      await supabase.from("bundle_items").insert([
-        {
-          nama_paket: document.getElementById("resPkg").value,
-          nama_barang_stok: document.getElementById("resItem").value,
-          jumlah_potong: qty,
-        },
-      ]);
+      const { isConfirmed } = await Swal.fire({
+        title: "Tambah Resep?",
+        text: "Item akan otomatis memotong stok saat paket diproses.",
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonColor: "#43b581",
+        background: "#2f3136",
+        color: "#fff",
+      });
 
-      loadAll();
+      if (isConfirmed) {
+        await supabase.from("bundle_items").insert([
+          {
+            nama_paket: document.getElementById("resPkg").value,
+            nama_barang_stok: document.getElementById("resItem").value,
+            jumlah_potong: qty,
+          },
+        ]);
+        loadAll();
+      }
     };
 
-    // Eksekusi load pertama kali
     await loadAll();
   },
 };

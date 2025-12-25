@@ -18,11 +18,11 @@ export const KatalogPage = {
         <div style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr auto; gap: 15px; align-items: end;">
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">NAMA BARANG</label>
-                <input type="text" id="katNama" placeholder="Micro SMG" style="background:#202225; border:1px solid #4f545c;">
+                <input type="text" id="katNama" placeholder="Micro SMG" style="background:#202225; border:1px solid #4f545c; color:white; width:100%; padding:8px; border-radius:4px;">
             </div>
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">JENIS</label>
-                <select id="katJenis" style="background:#202225; border:1px solid #4f545c;">
+                <select id="katJenis" style="background:#202225; border:1px solid #4f545c; color:white; width:100%; padding:8px; border-radius:4px;">
                     <option value="Vest">Vest</option>
                     <option value="Ammo">Ammo</option>
                     <option value="Weapon">Weapon (Serialized)</option>
@@ -32,16 +32,16 @@ export const KatalogPage = {
             </div>
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">HARGA ($)</label>
-                <input type="number" id="katHarga" placeholder="0" style="background:#202225; border:1px solid #4f545c;">
+                <input type="number" id="katHarga" placeholder="0" style="background:#202225; border:1px solid #4f545c; color:white; width:100%; padding:8px; border-radius:4px;">
             </div>
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">STATUS</label>
-                <select id="katStatus" style="background:#202225; border:1px solid #4f545c;">
+                <select id="katStatus" style="background:#202225; border:1px solid #4f545c; color:white; width:100%; padding:8px; border-radius:4px;">
                     <option value="Ready">Ready</option>
                     <option value="Not Ready">Not Ready</option>
                 </select>
             </div>
-            <button id="btnSaveKatalog" style="background:#5865F2; padding: 10px 25px; font-weight:bold; height:40px;">SIMPAN</button>
+            <button id="btnSaveKatalog" style="background:#5865F2; padding: 10px 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">SIMPAN</button>
         </div>
     </div>
 
@@ -83,15 +83,10 @@ export const KatalogPage = {
         .order("nama_barang");
       if (error) return;
 
-      // --- 1. Render Stats ---
       renderStats(data);
-
-      // --- 2. Filter Logic ---
       const filtered = data.filter((i) =>
         i.nama_barang.toLowerCase().includes(st.searchQuery.toLowerCase())
       );
-
-      // --- 3. Pagination Logic ---
       const totalPages = Math.ceil(filtered.length / st.itemsPerPage) || 1;
       const paginated = filtered.slice(
         (st.currentPage - 1) * st.itemsPerPage,
@@ -116,11 +111,10 @@ export const KatalogPage = {
               colors[idx]
             }">
                 <div style="font-size:0.7rem; color:#b9bbbe; text-transform:uppercase;">${t}</div>
-                <div style="font-size:1.5rem; font-weight:bold;">${count(
+                <div style="font-size:1.5rem; font-weight:bold; color:#fff;">${count(
                   t
                 )} <span style="font-size:0.8rem; color:#4f545c;">Items</span></div>
-            </div>
-        `
+            </div>`
         )
         .join("");
     };
@@ -155,16 +149,15 @@ export const KatalogPage = {
           }" data-jenis="${item.jenis_barang}" data-harga="${
             item.harga_satuan
           }" data-status="${item.status}" 
-                    style="background:#faa61a; padding:6px 12px; font-size:0.75rem; margin-right:5px;"><i class="fas fa-edit"></i></button>
+                    style="background:#faa61a; padding:6px 12px; font-size:0.75rem; margin-right:5px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-edit"></i></button>
                 <button class="btn-delete-kat" data-id="${
                   item.id
-                }" style="background:#ed4245; padding:6px 12px; font-size:0.75rem;"><i class="fas fa-trash"></i></button>
+                }" style="background:#ed4245; padding:6px 12px; font-size:0.75rem; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`
         )
         .join("");
 
-      // Re-bind Edit/Delete Events
       tbody.querySelectorAll(".btn-edit-kat").forEach((btn) => {
         btn.onclick = () => {
           inputNama.value = btn.dataset.nama;
@@ -189,6 +182,7 @@ export const KatalogPage = {
             icon: "warning",
             showCancelButton: true,
             confirmButtonColor: "#ed4245",
+            cancelButtonColor: "#4f545c",
             background: "#2f3136",
             color: "#fff",
           });
@@ -204,101 +198,46 @@ export const KatalogPage = {
     };
 
     const renderPagination = (totalPages) => {
-      const container = document.getElementById("katPagination"); // Sesuaikan ID-nya
-      if (!container) return;
-      if (totalPages <= 1) {
-        container.innerHTML = "";
+      const container = document.getElementById("katPagination");
+      if (!container || totalPages <= 1) {
+        if (container) container.innerHTML = "";
         return;
       }
-
       const curr = st.currentPage;
       const baseBtn = `border:none; color:white; padding:8px 12px; margin:0 2px; border-radius:6px; cursor:pointer; font-size:0.8rem; transition:0.2s; display:flex; align-items:center; min-width:35px; justify-content:center;`;
-
-      // LOGIKA SLIDING WINDOW (Hanya tampilkan maksimal 3 angka)
       let start = Math.max(1, curr - 1);
       let end = Math.min(totalPages, start + 2);
+      if (end - start < 2) start = Math.max(1, end - 2);
 
-      // Adjustment jika di akhir halaman
-      if (end - start < 2) {
-        start = Math.max(1, end - 2);
-      }
-
-      let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">`;
-
-      // Tombol First & Prev
-      html += `
-    <button class="pg-nav" data-page="1" ${
-      curr === 1
-        ? 'disabled style="opacity:0.2;' + baseBtn + '"'
-        : 'style="' + baseBtn + 'background:#202225;"'
-    }>
-        <i class="fas fa-angles-left"></i>
-    </button>
-    <button class="pg-nav" data-page="${curr - 1}" ${
+      let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f;">`;
+      html += `<button class="pg-nav" data-page="1" ${
         curr === 1
           ? 'disabled style="opacity:0.2;' + baseBtn + '"'
           : 'style="' + baseBtn + 'background:#202225;"'
-      }>
-        <i class="fas fa-chevron-left"></i>
-    </button>
-  `;
-
-      // Render Angka (Hanya yang masuk dalam range start-end)
+      }><i class="fas fa-angles-left"></i></button>`;
       for (let i = start; i <= end; i++) {
         const active = i === curr;
-        html += `
-      <button class="pg-nav" data-page="${i}" style="${baseBtn} background:${
+        html += `<button class="pg-nav" data-page="${i}" style="${baseBtn} background:${
           active ? "#5865F2" : "#4f545c"
-        }; ${
-          active
-            ? "box-shadow:0 4px 12px rgba(88,101,242,0.4); border:1px solid white; transform: scale(1.1); z-index:2;"
-            : ""
-        }">
-        ${i}
-      </button>
-    `;
+        };">${i}</button>`;
       }
-
-      // Tombol Next & Last
-      html += `
-    <button class="pg-nav" data-page="${curr + 1}" ${
+      html += `<button class="pg-nav" data-page="${totalPages}" ${
         curr === totalPages
           ? 'disabled style="opacity:0.2;' + baseBtn + '"'
           : 'style="' + baseBtn + 'background:#202225;"'
-      }>
-        <i class="fas fa-chevron-right"></i>
-    </button>
-    <button class="pg-nav" data-page="${totalPages}" ${
-        curr === totalPages
-          ? 'disabled style="opacity:0.2;' + baseBtn + '"'
-          : 'style="' + baseBtn + 'background:#202225;"'
-      }>
-        <i class="fas fa-angles-right"></i>
-    </button>
-  </div>`;
-
+      }><i class="fas fa-angles-right"></i></button></div>`;
       container.innerHTML = html;
-
-      // Binding Event
       container.querySelectorAll(".pg-nav").forEach((btn) => {
         btn.onclick = () => {
-          const targetPage = parseInt(btn.dataset.page);
-          if (targetPage !== curr) {
-            st.currentPage = targetPage;
-            loadKatalog(); // Pastikan panggil fungsi load data utamanya
-            // Scroll halus ke atas tabel agar user tahu data berubah
-            container
-              .closest("div")
-              .scrollIntoView({ behavior: "smooth", block: "nearest" });
-          }
+          st.currentPage = parseInt(btn.dataset.page);
+          loadKatalog();
         };
       });
     };
 
-    // --- Save Handler ---
     btnSave.onclick = async () => {
       const payload = {
-        nama_barang: inputNama.value,
+        nama_barang: inputNama.value.trim(),
         jenis_barang: inputJenis.value,
         harga_satuan: parseFloat(inputHarga.value) || 0,
         status: inputStatus.value,
@@ -307,31 +246,49 @@ export const KatalogPage = {
       if (!payload.nama_barang)
         return Swal.fire("Error", "Nama barang wajib diisi!", "error");
 
-      if (btnSave.dataset.mode === "edit") {
-        await supabase
-          .from("katalog_barang")
-          .update(payload)
-          .eq("id", btnSave.dataset.id);
-        delete btnSave.dataset.mode;
-        btnSave.innerText = "SIMPAN";
-        btnSave.style.background = "#5865F2";
-        document.getElementById("formTitle").innerText = "Tambah Barang Baru";
-      } else {
-        await supabase.from("katalog_barang").insert([payload]);
-      }
+      const isEdit = btnSave.dataset.mode === "edit";
 
-      Swal.fire({
-        icon: "success",
-        title: "Tersimpan!",
-        timer: 1000,
-        showConfirmButton: false,
+      const { isConfirmed } = await Swal.fire({
+        title: isEdit ? "Update Barang?" : "Simpan Barang?",
+        text: isEdit
+          ? "Pastikan data perubahan sudah benar."
+          : "Tambahkan barang ini ke katalog?",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: isEdit ? "#faa61a" : "#5865F2",
+        cancelButtonColor: "#4f545c",
+        background: "#2f3136",
+        color: "#fff",
       });
-      inputNama.value = "";
-      inputHarga.value = "";
-      loadKatalog();
+
+      if (isConfirmed) {
+        if (isEdit) {
+          await supabase
+            .from("katalog_barang")
+            .update(payload)
+            .eq("id", btnSave.dataset.id);
+          delete btnSave.dataset.mode;
+          btnSave.innerText = "SIMPAN";
+          btnSave.style.background = "#5865F2";
+          document.getElementById("formTitle").innerText = "Tambah Barang Baru";
+        } else {
+          await supabase.from("katalog_barang").insert([payload]);
+        }
+
+        Swal.fire({
+          title: "Berhasil",
+          text: isEdit ? "Data barang diupdate" : "Barang disimpan",
+          icon: "success",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+
+        inputNama.value = "";
+        inputHarga.value = "";
+        loadKatalog();
+      }
     };
 
-    // --- Search Listener ---
     document.getElementById("katSearch").oninput = (e) => {
       st.searchQuery = e.target.value;
       st.currentPage = 1;
