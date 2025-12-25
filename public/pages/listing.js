@@ -56,16 +56,21 @@ export const ListingPage = {
     const totalDisplay = document.getElementById("totalDisplay");
 
     let priceMap = {};
-    let dbBundles = []; // Simpan data paket dari DB
+    let dbBundles = [];
+    let fullKatalog = []; // Untuk referensi tipe barang (Weapon/General)
 
-    // AMBIL DATA PAKET DARI DB
+    // AMBIL DATA PAKET & KATALOG DARI DB
     const { data: pkgData } = await supabase.from("master_paket").select("*");
+    const { data: katData } = await supabase
+      .from("katalog_barang")
+      .select("nama_barang, jenis_barang");
+
     dbBundles = pkgData || [];
+    fullKatalog = katData || [];
 
     const updateTotalPrice = () => {
       let total = 0;
       if (tipeSelect.value === "Bundling") {
-        // AMBIL HARGA DARI DATA DB
         const selected = dbBundles.find(
           (p) => p.nama_paket === subSelect.value
         );
@@ -121,7 +126,6 @@ export const ListingPage = {
         subContainer.style.display = "block";
         document.getElementById("labelSubTipe").innerText =
           "Pilih Paket Bundling";
-        // LOOP DARI DATABASE
         dbBundles.forEach((pkg) => {
           subSelect.innerHTML += `<option value="${pkg.nama_paket}">${pkg.nama_paket}</option>`;
         });
@@ -142,15 +146,13 @@ export const ListingPage = {
       const subTipe = subSelect.value;
 
       if (tipe === "Bundling" && subTipe) {
-        // AMBIL DETAIL DARI DATA DB
         const selected = dbBundles.find((p) => p.nama_paket === subTipe);
         infoDisplay.innerText = selected
           ? `Isi: ${selected.deskripsi_isi}`
           : "Detail tidak ditemukan";
         infoDisplay.style.display = "block";
-        document.getElementById("checkboxList").innerHTML = "";
-        document.getElementById("finalOptionsContainer").style.display =
-          "block";
+        checkList.innerHTML = "";
+        finalContainer.style.display = "block";
         updateTotalPrice();
       } else if (tipe === "Non Bundling" && subTipe) {
         finalContainer.style.display = "block";
@@ -181,23 +183,16 @@ export const ListingPage = {
                         </div>
                         <div class="qty-control">
                           <button type="button" class="qty-btn minus">−</button>
-
-                          <input type="number"
-                                class="item-qty"
-                                data-name="${item.nama_barang}"
-                                value="0"
-                                min="0"
-                                style="width:60px;">
-
+                          <input type="number" class="item-qty" data-name="${
+                            item.nama_barang
+                          }" value="0" min="0" style="width:60px;">
                           <button type="button" class="qty-btn plus">+</button>
                         </div>
-                        
                     </div>`;
           });
-
-          document.querySelectorAll(".item-qty").forEach((input) => {
-            input.oninput = updateTotalPrice;
-          });
+          document
+            .querySelectorAll(".item-qty")
+            .forEach((input) => (input.oninput = updateTotalPrice));
         } else {
           checkList.innerHTML =
             "<p style='font-size:0.8rem; color:#ed4245;'>Maaf, tidak ada item yang tersedia saat ini.</p>";
@@ -206,7 +201,6 @@ export const ListingPage = {
       }
     };
 
-    // 4. Submit Form (Pembaruan: Simpan ke DB & Kirim Discord)
     document.getElementById("myForm").onsubmit = async (e) => {
       e.preventDefault();
       const btn = document.getElementById("submitBtn");
@@ -225,32 +219,23 @@ export const ListingPage = {
           item_type: "Bundling",
           quantity: 1,
           status: "pending",
-          total_price: document.getElementById("totalDisplay").innerText,
+          total_price: totalDisplay.innerText,
         });
       } else {
         const itemElements = document.querySelectorAll(".item-qty");
         itemElements.forEach((el) => {
           const qty = parseInt(el.value);
           if (qty > 0) {
-            // Tentukan tipe: Jika ada kata 'Ammo' atau 'Vest' tetap General,
-            // Jika mengandung senjata (logic sederhana) bisa disesuaikan
-            let type = "General";
-            const weaponKeywords = [
-              "Glock",
-              "Combat",
-              "Rifle",
-              "SMG",
-              "Shotgun",
-              "Pistol",
-            ];
-            if (weaponKeywords.some((kw) => el.dataset.name.includes(kw))) {
-              type = "Weapon";
-            }
+            // PERBAIKAN DI SINI: Referensi otomatis ke jenis_barang di katalog
+            const matchKatalog = fullKatalog.find(
+              (k) => k.nama_barang === el.dataset.name
+            );
+            const type = matchKatalog ? matchKatalog.jenis_barang : "General";
 
             requests.push({
               requested_by: namaMember,
               item_name: el.dataset.name,
-              item_type: type,
+              item_type: type, // Otomatis jadi "Weapon" jika itu senjata
               quantity: qty,
               status: "pending",
               total_price: `$${(
@@ -265,13 +250,11 @@ export const ListingPage = {
         if (requests.length === 0)
           throw new Error("Pilih setidaknya satu item!");
 
-        // Simpan ke tabel orders
         const { error: dbError } = await supabase
           .from("orders")
           .insert(requests);
         if (dbError) throw dbError;
 
-        // Kirim ke Discord (Gunakan bodyData lama Anda untuk format chat)
         await fetch("/api/submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -283,15 +266,15 @@ export const ListingPage = {
             itemDetail: requests
               .map((r) => `${r.item_name} x${r.quantity}`)
               .join("\n"),
-            totalHarga: document.getElementById("totalDisplay").innerText,
+            totalHarga: totalDisplay.innerText,
           }),
         });
 
         Swal.fire("Berhasil!", "Pesanan dikirim ke Admin.", "success");
         document.getElementById("myForm").reset();
-        document.getElementById("subTipeContainer").style.display = "none";
-        document.getElementById("finalOptionsContainer").style.display = "none";
-        document.getElementById("totalDisplay").innerText = "$0";
+        subContainer.style.display = "none";
+        finalContainer.style.display = "none";
+        totalDisplay.innerText = "$0";
       } catch (err) {
         Swal.fire("Error", err.message, "error");
       } finally {
@@ -302,13 +285,16 @@ export const ListingPage = {
 
     document.addEventListener("click", (e) => {
       if (e.target.classList.contains("plus")) {
-        const input = e.target.closest(".qty-control").querySelector(".item-qty");
+        const input = e.target
+          .closest(".qty-control")
+          .querySelector(".item-qty");
         input.value = Number(input.value || 0) + 1;
         input.dispatchEvent(new Event("input"));
       }
-
       if (e.target.classList.contains("minus")) {
-        const input = e.target.closest(".qty-control").querySelector(".item-qty");
+        const input = e.target
+          .closest(".qty-control")
+          .querySelector(".item-qty");
         const current = Number(input.value || 0);
         if (current > Number(input.min || 0)) {
           input.value = current - 1;

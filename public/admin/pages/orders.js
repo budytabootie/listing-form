@@ -32,9 +32,7 @@ export const OrdersPage = {
                   order.item_type === "Weapon" ? "#5865F2" : "#faa61a"
                 }; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <span style="font-size:0.65rem; background:#202225; padding:2px 6px; border-radius:4px; color:#b9bbbe;">${
-                          order.item_type
-                        }</span>
+                        <span style="font-size:0.65rem; background:#202225; padding:2px 6px; border-radius:4px; color:#b9bbbe; font-weight:bold;">${order.item_type.toUpperCase()}</span>
                         <div style="font-size: 1.1rem; font-weight: bold; color: #fff; margin-top:5px;">${
                           order.item_name
                         } <span style="color:#43b581;">x${
@@ -42,7 +40,7 @@ export const OrdersPage = {
           }</span></div>
                         <div style="font-size: 0.85rem; color: #b9bbbe;">User: <strong>${
                           order.requested_by
-                        }</strong> | ${order.total_price}</div>
+                        }</strong></div>
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn-app" data-id="${
@@ -60,61 +58,100 @@ export const OrdersPage = {
       container
         .querySelectorAll(".btn-app")
         .forEach(
-          (btn) => (btn.onclick = () => process(btn.dataset.id, "approved"))
+          (btn) =>
+            (btn.onclick = () => confirmAction(btn.dataset.id, "approved"))
         );
       container
         .querySelectorAll(".btn-rej")
         .forEach(
-          (btn) => (btn.onclick = () => process(btn.dataset.id, "rejected"))
+          (btn) =>
+            (btn.onclick = () => confirmAction(btn.dataset.id, "rejected"))
         );
+    };
+
+    const confirmAction = async (id, status) => {
+      const order = OrdersPage.state.orders.find((o) => o.id == id);
+      const { isConfirmed } = await Swal.fire({
+        title: status === "approved" ? "Approve Order?" : "Reject Order?",
+        text: `${status === "approved" ? "Berikan" : "Tolak"} ${
+          order.item_name
+        } untuk ${order.requested_by}?`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: status === "approved" ? "#43b581" : "#ed4245",
+        background: "#2f3136",
+        color: "#fff",
+      });
+      if (isConfirmed) process(id, status);
     };
 
     const process = async (id, status) => {
       const order = OrdersPage.state.orders.find((o) => o.id == id);
+
       if (status === "approved") {
         if (order.item_type === "Weapon") {
-          const { data: unit } = await supabase
+          // PERBAIKAN DI SINI: Mencari unit yang tersedia
+          const { data: units, error } = await supabase
             .from("inventory_weapons")
-            .select("id")
+            .select("*")
             .eq("weapon_name", order.item_name)
-            .eq("status", "available")
-            .limit(1)
-            .single();
-          if (!unit)
+            .is("hold_by", null) // Pastikan tidak ada yang pegang
+            .eq("status", "available") // Dan statusnya available
+            .limit(1);
+
+          if (error || !units || units.length === 0) {
             return Swal.fire(
               "Stok Kosong",
-              "Tidak ada unit tersedia di gudang!",
+              `Gudang tidak memiliki unit ${order.item_name} yang siap (Available).`,
               "error"
             );
+          }
+
+          const targetUnit = units[0];
+          // Update unit senjata tersebut
           await supabase
             .from("inventory_weapons")
-            .update({ status: "in_use", hold_by: order.requested_by })
-            .eq("id", unit.id);
-        } else if (order.item_type === "General") {
+            .update({
+              status: "in_use",
+              hold_by: order.requested_by,
+            })
+            .eq("id", targetUnit.id);
+        } else {
+          // Logika untuk barang umum
           const { data: inv } = await supabase
             .from("inventory")
-            .select("stock, id")
+            .select("*")
             .eq("item_name", order.item_name)
             .single();
-          if (!inv || inv.stock < order.quantity)
+          if (!inv || inv.stock < order.quantity) {
             return Swal.fire(
               "Stok Kurang",
-              "Stok gudang tidak mencukupi!",
+              "Stok di Warehouse Inventory tidak mencukupi!",
               "error"
             );
+          }
           await supabase
             .from("inventory")
             .update({ stock: inv.stock - order.quantity })
             .eq("id", inv.id);
         }
-        // Note: Untuk Bundling, Anda bisa menambah logic breakdown item di sini jika perlu.
       }
+
+      // Update status di tabel orders
       await supabase
         .from("orders")
         .update({ status: status, processed_at: new Date().toISOString() })
         .eq("id", id);
+
+      Swal.fire({
+        icon: "success",
+        title: "Order Processed",
+        timer: 1000,
+        showConfirmButton: false,
+      });
       loadOrders();
     };
+
     loadOrders();
   },
 };
