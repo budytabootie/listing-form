@@ -26,8 +26,8 @@ export const UsersPage = {
                 <input type="text" id="addUsername" placeholder="budi_nakama" style="background:#202225; border:1px solid #4f545c; height:40px;">
             </div>
             <div>
-                <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">PASSWORD</label>
-                <input type="password" id="addPassword" placeholder="******" style="background:#202225; border:1px solid #4f545c; height:40px;">
+                <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">PASSWORD (AUTO)</label>
+                <input type="text" id="addPassword" readonly style="background:#202225; border:1px solid #4f545c; height:40px; color:#faa61a; font-weight:bold; cursor:default;">
             </div>
             <div>
                 <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">ROLE</label>
@@ -54,6 +54,7 @@ export const UsersPage = {
                 <tr style="background: #202225; text-align: left; color:#b9bbbe;">
                     <th style="padding: 18px;">NAMA PENGGUNA</th>
                     <th style="padding: 18px;">USERNAME</th>
+                    <th style="padding: 18px;">PASSWORD</th>
                     <th style="padding: 18px;">AKSES ROLE</th>
                     <th style="padding: 18px; text-align: center;">AKSI</th>
                 </tr>
@@ -68,6 +69,14 @@ export const UsersPage = {
   init: async (supabase) => {
     const st = UsersPage.state;
 
+    const generatePass = () => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+      let res = "";
+      for (let i = 0; i < 6; i++)
+        res += chars.charAt(Math.floor(Math.random() * chars.length));
+      document.getElementById("addPassword").value = res;
+    };
+
     const loadUsers = async () => {
       const { data, error } = await supabase
         .from("users_login")
@@ -75,14 +84,12 @@ export const UsersPage = {
         .order("nama_lengkap");
       if (error) return;
 
-      // 1. Filtering
       const filtered = data.filter(
         (u) =>
           u.nama_lengkap.toLowerCase().includes(st.searchQuery.toLowerCase()) ||
           u.username.toLowerCase().includes(st.searchQuery.toLowerCase())
       );
 
-      // 2. Pagination Logic
       const totalPages = Math.ceil(filtered.length / st.itemsPerPage) || 1;
       const paginated = filtered.slice(
         (st.currentPage - 1) * st.itemsPerPage,
@@ -98,47 +105,45 @@ export const UsersPage = {
       tableBody.innerHTML = items
         .map(
           (user) => `
-        <tr style="border-bottom: 1px solid #36393f; transition: 0.2s;" onmouseover="this.style.background='#36393f'" onmouseout="this.style.background='transparent'">
+        <tr style="border-bottom: 1px solid #36393f;">
             <td style="padding: 15px; font-weight:bold; color:#fff;">${
               user.nama_lengkap
             }</td>
-            <td style="padding: 15px;"><code style="color:#faa61a; background:rgba(250,166,26,0.1); padding:3px 6px; border-radius:4px;">@${
+            <td style="padding: 15px;"><code style="color:#faa61a;">@${
               user.username
             }</code></td>
             <td style="padding: 15px;">
-                <span style="background:${
-                  user.role === "admin"
-                    ? "rgba(237,66,69,0.1)"
-                    : "rgba(88,101,242,0.1)"
-                }; 
-                             color:${
-                               user.role === "admin" ? "#ed4245" : "#5865F2"
-                             }; 
-                             padding:4px 12px; border-radius:20px; font-size:0.7rem; font-weight:bold; border:1px solid currentColor; text-transform:uppercase;">
-                    <i class="fas ${
-                      user.role === "admin" ? "fa-crown" : "fa-user"
-                    } " style="margin-right:5px;"></i>${user.role}
+                ${
+                  user.is_encrypted
+                    ? '<span style="color:#4f545c; font-size:0.8rem; font-style:italic;"><i class="fas fa-lock"></i> Encrypted</span>'
+                    : `<span style="color:#fff; background:#4f545c; padding:2px 8px; border-radius:4px; font-family:monospace;">${user.password}</span>`
+                }
+            </td>
+            <td style="padding: 15px;">
+                <span style="color:${
+                  user.role === "admin" ? "#ed4245" : "#5865F2"
+                }; font-size:0.7rem; font-weight:bold; text-transform:uppercase;">
+                    ${user.role}
                 </span>
             </td>
             <td style="padding: 15px; text-align: center;">
                 <button class="btn-delete-user" data-id="${
                   user.id
-                }" data-name="${user.nama_lengkap}"
-                    style="background:#ed4245; padding:8px 15px; width:auto;"><i class="fas fa-trash-alt"></i> Hapus</button>
+                }" data-name="${
+            user.nama_lengkap
+          }" style="background:#ed4245; padding:5px 10px; width:auto;"><i class="fas fa-trash-alt"></i></button>
             </td>
         </tr>`
         )
         .join("");
 
-      // Bind Hapus
       tableBody.querySelectorAll(".btn-delete-user").forEach((btn) => {
         btn.onclick = async () => {
           const { isConfirmed } = await Swal.fire({
-            title: "Hapus Akun?",
-            text: `Akun "${btn.dataset.name}" akan dihapus permanen!`,
+            title: "Hapus?",
+            text: btn.dataset.name,
             icon: "warning",
             showCancelButton: true,
-            confirmButtonColor: "#ed4245",
             background: "#2f3136",
             color: "#fff",
           });
@@ -155,45 +160,16 @@ export const UsersPage = {
 
     const renderPagination = (totalPages) => {
       const container = document.getElementById("userPagination");
-      if (totalPages <= 1) {
-        container.innerHTML = "";
-        return;
-      }
+      if (totalPages <= 1) return (container.innerHTML = "");
 
-      const curr = st.currentPage;
-      const baseBtn = `border:none; color:white; padding:8px 12px; margin:0 2px; border-radius:6px; cursor:pointer; font-size:0.85rem; transition:0.2s; display:flex; align-items:center; min-width:35px; justify-content:center;`;
-
-      let start = Math.max(1, curr - 1);
-      let end = Math.min(totalPages, start + 2);
-      if (end - start < 2) start = Math.max(1, end - 2);
-
-      let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f;">`;
-
-      // First & Prev
-      html += `<button class="pg-nav" data-page="1" ${
-        curr === 1
-          ? 'disabled style="opacity:0.3;' + baseBtn + '"'
-          : 'style="' + baseBtn + 'background:#202225;"'
-      }><i class="fas fa-angles-left"></i></button>`;
-
-      // Numbers
-      for (let i = start; i <= end; i++) {
-        const active = i === curr;
-        html += `<button class="pg-nav" data-page="${i}" style="${baseBtn} background:${
+      let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px;">`;
+      for (let i = 1; i <= totalPages; i++) {
+        const active = i === st.currentPage;
+        html += `<button class="pg-nav" data-page="${i}" style="border:none; color:white; padding:5px 10px; margin:2px; border-radius:4px; background:${
           active ? "#faa61a" : "#4f545c"
-        }; color:${active ? "black" : "white"}; ${
-          active ? "font-weight:bold;" : ""
         }">${i}</button>`;
       }
-
-      // Next & Last
-      html += `<button class="pg-nav" data-page="${totalPages}" ${
-        curr === totalPages
-          ? 'disabled style="opacity:0.3;' + baseBtn + '"'
-          : 'style="' + baseBtn + 'background:#202225;"'
-      }><i class="fas fa-angles-right"></i></button></div>`;
-      html += `<span style="color: #b9bbbe; font-size: 0.75rem; margin-left: 15px;">Page <b>${curr}</b> of ${totalPages}</span>`;
-
+      html += `</div>`;
       container.innerHTML = html;
       container.querySelectorAll(".pg-nav").forEach((btn) => {
         btn.onclick = () => {
@@ -203,42 +179,39 @@ export const UsersPage = {
       });
     };
 
-    // Event Search
     document.getElementById("userSearch").oninput = (e) => {
       st.searchQuery = e.target.value;
       st.currentPage = 1;
       loadUsers();
     };
 
-    // Event Submit
     document.getElementById("btnCreateUser").onclick = async () => {
       const nama_lengkap = document.getElementById("addFullName").value;
       const username = document.getElementById("addUsername").value;
       const password = document.getElementById("addPassword").value;
       const role = document.getElementById("addRole").value;
 
-      if (!nama_lengkap || !username || !password)
-        return Swal.fire("Error", "Lengkapi semua field!", "error");
+      if (!nama_lengkap || !username)
+        return Swal.fire("Error", "Nama & Username wajib diisi!", "error");
 
       const { error } = await supabase
         .from("users_login")
-        .insert([{ nama_lengkap, username, password, role }]);
+        .insert([
+          { nama_lengkap, username, password, role, is_encrypted: false },
+        ]);
       if (error) {
         Swal.fire("Gagal", error.message, "error");
       } else {
-        Swal.fire({
-          icon: "success",
-          title: "User Dibuat",
-          timer: 1000,
-          showConfirmButton: false,
-        });
-        ["addFullName", "addUsername", "addPassword"].forEach(
+        Swal.fire("Berhasil", `User Created. Pass: ${password}`, "success");
+        ["addFullName", "addUsername"].forEach(
           (id) => (document.getElementById(id).value = "")
         );
+        generatePass();
         loadUsers();
       }
     };
 
+    generatePass();
     loadUsers();
   },
 };

@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Nakama MC</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+
 <body class="no-sidebar">
     <div class="container">
         <form id="loginForm">
@@ -20,7 +23,8 @@
             <input type="text" id="username" placeholder="Masukkan username" required autocomplete="username">
 
             <label>Password</label>
-            <input type="password" id="password" placeholder="Masukkan password" required autocomplete="current-password">
+            <input type="password" id="password" placeholder="Masukkan password" required
+                autocomplete="current-password">
 
             <button type="submit" id="loginBtn">Masuk</button>
         </form>
@@ -30,85 +34,7 @@
         <p>&copy; 2025 <b>Nakama MC</b>. All Rights Reserved.</p>
     </footer>
 
-    <script>
-        const loginForm = document.getElementById('loginForm');
-        let _supabase;
-
-        async function initSupabase() {
-            try {
-                const response = await fetch('/api/get-config');
-                const config = await response.json();
-                _supabase = supabase.createClient(config.supabaseUrl, config.supabaseKey);
-                
-                // Cek jika sudah login, langsung lempar ke dashboard yang sesuai
-                const session = sessionStorage.getItem('userData');
-                if (session) {
-                    const user = JSON.parse(session);
-                    redirectUser(user.role);
-                }
-            } catch (err) {
-                console.error("Gagal koneksi server:", err);
-            }
-        }
-
-        function redirectUser(role) {
-            const userRole = (role || 'user').toLowerCase();
-            if (userRole === 'admin' || userRole === 'superadmin') {
-                // ARAHKAN KE FOLDER ADMIN
-                window.location.href = '/admin/';
-            } else {
-                window.location.href = '/';
-            }
-        }
-
-        loginForm.onsubmit = async (e) => {
-            e.preventDefault();
-            if (!_supabase) return;
-
-            const usernameInput = document.getElementById('username').value.trim();
-            const passwordInput = document.getElementById('password').value;
-            const btn = document.getElementById('loginBtn');
-
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memverifikasi...';
-
-            try {
-                const { data: user, error } = await _supabase
-                    .from('users_login')
-                    .select('*')
-                    .eq('username', usernameInput)
-                    .eq('password', passwordInput)
-                    .single();
-
-                if (error || !user) throw new Error('Username atau password salah.');
-
-                sessionStorage.setItem('isLoggedIn', 'true');
-                sessionStorage.setItem('userData', JSON.stringify(user));
-
-                Swal.fire({
-                    title: 'Berhasil!',
-                    text: `Selamat datang kembali, ${user.nama_lengkap}`,
-                    icon: 'success',
-                    timer: 1000,
-                    showConfirmButton: false,
-                    background: '#1e1e1e', color: '#fff'
-                }).then(() => {
-                    redirectUser(user.role);
-                });
-
-            } catch (err) {
-                Swal.fire({ 
-                    title: 'Gagal Login', 
-                    text: err.message, 
-                    icon: 'error', 
-                    background: '#1e1e1e', color: '#fff' 
-                });
-                btn.disabled = false;
-                btn.innerText = 'Masuk';
-            }
-        };
-
-        initSupabase();
-    </script>
+    <script src="login.js"></script>
 </body>
+
 </html>

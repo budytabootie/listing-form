@@ -7,8 +7,6 @@ import { HistoryPage } from "./pages/history.js";
 import { BundlePage } from "./pages/bundle.js";
 import { OrdersPage } from "./pages/orders.js";
 
-console.log("BundlePage object:", BundlePage);
-
 let _supabase;
 
 window.loadPage = (page) => {
@@ -19,30 +17,20 @@ window.loadPage = (page) => {
     .querySelectorAll(".menu-item")
     .forEach((m) => m.classList.remove("active"));
 
-  if (page === "members") {
-    area.innerHTML = MembersPage.render();
-    MembersPage.init(_supabase);
-  } else if (page === "orders") {
-    area.innerHTML = OrdersPage.render();
-    OrdersPage.init(_supabase);
-  } else if (page === "katalog") {
-    area.innerHTML = KatalogPage.render();
-    KatalogPage.init(_supabase);
-  } else if (page === "users") {
-    area.innerHTML = UsersPage.render();
-    UsersPage.init(_supabase);
-  } else if (page === "stok") {
-    area.innerHTML = StokPage.render();
-    StokPage.init(_supabase);
-  } else if (page === "stok_weapon") {
-    area.innerHTML = StokWeaponPage.render();
-    StokWeaponPage.init(_supabase);
-  } else if (page === "history") {
-    area.innerHTML = HistoryPage.render();
-    HistoryPage.init(_supabase);
-  } else if (page === "bundling") {
-    area.innerHTML = BundlePage.render();
-    BundlePage.init(_supabase);
+  const pages = {
+    members: MembersPage,
+    orders: OrdersPage,
+    katalog: KatalogPage,
+    users: UsersPage,
+    stok: StokPage,
+    stok_weapon: StokWeaponPage,
+    history: HistoryPage,
+    bundling: BundlePage,
+  };
+
+  if (pages[page]) {
+    area.innerHTML = pages[page].render();
+    pages[page].init(_supabase);
   }
 
   const targetMenu = document.querySelector(`[onclick="loadPage('${page}')"]`);
@@ -50,31 +38,81 @@ window.loadPage = (page) => {
 };
 
 async function init() {
-  const userData = JSON.parse(sessionStorage.getItem("userData"));
-  if (!userData || userData.role !== "admin") {
-    window.location.href = "../login.html";
-    return;
-  }
+  try {
+    const configRes = await fetch("/api/get-config");
+    const config = await configRes.json();
+    _supabase = supabase.createClient(config.supabaseUrl, config.supabaseKey);
 
-  const res = await fetch("/api/get-config");
-  const config = await res.json();
-  _supabase = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+    const token = localStorage.getItem("sessionToken");
+    if (!token) {
+      window.location.href = "../login.html";
+      return;
+    }
 
-  // Setup Toggle Sidebar
-  const toggleBtn = document.getElementById("toggleBtn");
-  if (toggleBtn) {
-    toggleBtn.onclick = () => {
-      document.getElementById("sidebar").classList.toggle("collapsed");
-      document.getElementById("mainWrapper").classList.toggle("expanded");
+    const { data: sessionData, error } = await _supabase
+      .from("user_sessions")
+      .select("*, users_login(*)")
+      .eq("token", token)
+      .gt("expires_at", new Date().toISOString())
+      .single();
+
+    if (error || !sessionData || !sessionData.users_login) {
+      localStorage.removeItem("sessionToken");
+      window.location.href = "../login.html";
+      return;
+    }
+
+    const userData = sessionData.users_login;
+    if (userData.role !== "admin") {
+      window.location.href = "../login.html";
+      return;
+    }
+
+    // Tampilkan Nama Admin (Jika ada elemennya di navbar admin)
+    const nameDisplay = document.getElementById("userNameDisplay");
+    if (nameDisplay) nameDisplay.innerText = userData.nama_lengkap;
+
+    // Fungsi Ganti Password (Admin juga bisa ganti sendiri)
+    window.changePassword = async () => {
+      const { value: newPass } = await Swal.fire({
+        title: "Ganti Password Admin",
+        input: "text",
+        inputLabel: "Password baru ini akan langsung dienkripsi",
+        showCancelButton: true,
+        background: "#2f3136",
+        color: "#fff",
+      });
+      if (newPass) {
+        const { error } = await _supabase.rpc("update_user_password_secure", {
+          u_id: userData.id,
+          new_pass: newPass,
+        });
+        if (error) Swal.fire("Gagal", error.message, "error");
+        else Swal.fire("Sukses", "Password diupdate!", "success");
+      }
     };
-  }
 
-  // Load halaman pertama kali
-  window.loadPage("orders");
+    const toggleBtn = document.getElementById("toggleBtn");
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        document.getElementById("sidebar").classList.toggle("collapsed");
+        document.getElementById("mainWrapper").classList.toggle("expanded");
+      };
+    }
+
+    window.loadPage("orders");
+  } catch (err) {
+    console.error("Initialization failed:", err);
+    window.location.href = "../login.html";
+  }
 }
 
-window.logout = () => {
-  sessionStorage.clear();
+window.logout = async () => {
+  const token = localStorage.getItem("sessionToken");
+  if (token && _supabase) {
+    await _supabase.from("user_sessions").delete().eq("token", token);
+  }
+  localStorage.removeItem("sessionToken");
   window.location.href = "../login.html";
 };
 

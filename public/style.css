@@ -1,4 +1,5 @@
-/* public/style.css */
+/* Tetap pakai code asli kamu, tambahkan/sesuaikan bagian ini saja: */
+
 :root {
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 70px;
@@ -25,7 +26,7 @@ body {
   position: fixed;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
-  flex-direction: column;
+  flex-direction: column; /* Pastikan ini ada agar menu bisa ditumpuk ke bawah */
   z-index: 1000;
   border-right: 1px solid #282b2e;
 }
@@ -48,6 +49,8 @@ body {
   flex: 1;
   padding: 10px;
   margin-top: 10px;
+  display: flex; /* Tambahan: agar menu bawah bisa diposisikan */
+  flex-direction: column; /* Tambahan */
 }
 
 .menu-item {
@@ -81,6 +84,11 @@ body {
   pointer-events: none;
 }
 
+/* Tambahan kecil: Agar icon tetap bisa diklik saat collapsed */
+#sidebar.collapsed .menu-item {
+  padding-left: 15px;
+}
+
 .menu-item:hover,
 .menu-item.active {
   background: #393c43;
@@ -105,12 +113,20 @@ body {
   margin-left: var(--sidebar-collapsed-width);
 }
 
+/* CSS baru agar halaman Member/User biasa tidak bergeser karena Sidebar Admin */
+body.no-sidebar {
+  display: block;
+}
+body.no-sidebar .main-wrapper {
+  margin-left: 0;
+}
+
 .content-container {
   flex: 1;
   padding: 40px 20px;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Form di atas, tidak gantung di tengah */
+  align-items: flex-start;
 }
 
 /* FORM STYLING */
