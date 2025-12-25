@@ -272,3 +272,164 @@ footer {
 .page-nav:hover:not(:disabled) {
   background: #36393f;
 }
+
+
+/* ========== LISTING PAGE FORM ========== */
+
+/* Main card */
+#myForm {
+    background: #202225;
+    border-radius: 12px;
+    padding: 20px 18px;
+    max-width: 640px;
+    margin: 20px auto 40px auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+    color: #fff;
+}
+
+#myForm h3 {
+    text-align: center;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+/* Labels & controls */
+#myForm label {
+    display: block;
+    margin: 10px 0 4px;
+    font-size: 0.9rem;
+    color: #b9bbbe;
+}
+
+#myForm input[type="text"],
+#myForm input[type="number"],
+#myForm select {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid #2f3136;
+    background: #18191c;
+    color: #fff;
+    font-size: 0.9rem;
+    outline: none;
+    box-sizing: border-box;
+}
+
+#myForm input[type="text"]:focus,
+#myForm input[type="number"]:focus,
+#myForm select:focus {
+    border-color: #5865F2;
+}
+
+/* Autocomplete */
+#myForm .autocomplete-wrapper {
+    position: relative;
+}
+
+#autocomplete-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 3px;
+    background: #2f3136;
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+    z-index: 20;
+}
+
+.autocomplete-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #26292e;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover {
+    background: #3a3f45;
+}
+
+/* Checkbox / qty list area (non-bundling) */
+#checkboxList {
+    margin-top: 10px;
+}
+
+/* Inputs inside the dynamic list (already inline-styled, but unify font) */
+#myForm .item-qty {
+    font-size: 0.85rem;
+    padding: 4px 6px;
+    background: #18191c;
+    border-radius: 6px;
+    border: 1px solid #2f3136;
+    color: #fff;
+}
+
+/* Submit button */
+#submitBtn {
+    margin-top: 20px;
+    width: 100%;
+    padding: 10px 0;
+    border-radius: 8px;
+    border: none;
+    background: #5865F2;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.2s, transform 0.05s;
+}
+
+#submitBtn:hover {
+    background: #4752c4;
+}
+
+#submitBtn:active {
+    transform: scale(0.98);
+}
+
+#submitBtn:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+/* ========== RESPONSIVE LISTING FORM ========== */
+
+@media (max-width: 768px) {
+    #myForm {
+        margin: 15px auto 25px auto;
+        padding: 16px 14px;
+        max-width: 100%;
+    }
+
+    #myForm h3 {
+        font-size: 1.05rem;
+    }
+
+    #myForm label {
+        font-size: 0.85rem;
+    }
+
+    #myForm input[type="text"],
+    #myForm input[type="number"],
+    #myForm select {
+        font-size: 0.85rem;
+        padding: 8px 9px;
+    }
+
+    .autocomplete-item {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #myForm {
+        margin-top: 10px;
+    }
+}

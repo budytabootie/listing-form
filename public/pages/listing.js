@@ -179,9 +179,19 @@ export const ListingPage = {
                               item.harga_satuan
                             ).toLocaleString()}</small>
                         </div>
-                        <input type="number" class="item-qty" data-name="${
-                          item.nama_barang
-                        }" value="0" min="0" style="width:70px;">
+                        <div class="qty-control">
+                          <button type="button" class="qty-btn minus">−</button>
+
+                          <input type="number"
+                                class="item-qty"
+                                data-name="${item.nama_barang}"
+                                value="0"
+                                min="0"
+                                style="width:60px;">
+
+                          <button type="button" class="qty-btn plus">+</button>
+                        </div>
+                        
                     </div>`;
           });
 
@@ -289,5 +299,22 @@ export const ListingPage = {
         btn.innerText = "Kirim Laporan";
       }
     };
+
+    document.addEventListener("click", (e) => {
+      if (e.target.classList.contains("plus")) {
+        const input = e.target.closest(".qty-control").querySelector(".item-qty");
+        input.value = Number(input.value || 0) + 1;
+        input.dispatchEvent(new Event("input"));
+      }
+
+      if (e.target.classList.contains("minus")) {
+        const input = e.target.closest(".qty-control").querySelector(".item-qty");
+        const current = Number(input.value || 0);
+        if (current > Number(input.min || 0)) {
+          input.value = current - 1;
+          input.dispatchEvent(new Event("input"));
+        }
+      }
+    });
   },
 };

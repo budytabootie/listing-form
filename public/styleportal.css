@@ -1,0 +1,446 @@
+/* ===== Base page / reset ===== */
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.portal-body {
+    background-color: #36393f;
+    color: #fff;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ==============================
+   TOP NAVBAR (DESKTOP)
+============================== */
+.portal-nav {
+    background: #202225;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0 30px;
+    border-bottom: 2px solid #5865F2;
+    justify-content: space-between;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    z-index: 1000;
+    box-sizing: border-box;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.portal-nav-left,
+.portal-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Brand */
+.portal-brand {
+    font-weight: bold;
+    color: #5865F2;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.portal-brand-logo {
+    width: 22px;
+    height: 22px;
+}
+
+/* Desktop nav links on the right side */
+.portal-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.portal-nav-link {
+    color: #b9bbbe;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.portal-nav-link:hover {
+    background: rgba(79, 84, 92, 0.4);
+    color: #fff;
+}
+
+.portal-nav-link i {
+    font-size: 1rem;
+}
+
+/* Divider + user info + actions */
+.portal-divider {
+    width: 1px;
+    height: 24px;
+    background: #4f545c;
+}
+
+.portal-user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.2;
+}
+
+.portal-user-info #userNameDisplay,
+.portal-user-info #userNameDisplayMobile {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #fff;
+}
+
+.portal-user-status {
+    font-size: 0.65rem;
+    color: #43b581;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.portal-nav-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Buttons only in navbar */
+.portal-icon-btn {
+    background: #36393f;
+    color: #faa61a;
+    width: 35px;
+    height: 35px;
+    border-radius: 4px;
+    border: 1px solid #4f545c;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+
+.portal-icon-btn:hover {
+    filter: brightness(1.1);
+}
+
+.portal-logout-btn {
+    background: #ed4245;
+    color: white;
+    padding: 0 15px;
+    height: 35px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: 0.2s;
+}
+
+.portal-logout-btn:hover {
+    filter: brightness(1.1);
+}
+
+/* Hamburger (hidden on desktop) */
+.portal-menu-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.4rem;
+    cursor: pointer;
+}
+
+/* ==============================
+   MOBILE DROPDOWN MENU
+   (ALL NAV INFO IN HAMBURGER)
+============================== */
+.portal-mobile-menu {
+    display: none;
+    position: fixed;
+    top: 60px;              /* just under the navbar */
+    left: 0;
+    right: 0;
+    background: #202225;
+    border-bottom: 2px solid #5865F2;
+    padding: 10px 14px 12px 14px;
+    box-sizing: border-box;
+    z-index: 999;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.portal-mobile-menu.open {
+    display: flex;
+}
+
+.portal-mobile-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.portal-mobile-separator {
+    border: none;
+    border-top: 1px solid #4f545c;
+    margin: 6px 0;
+}
+
+/* ==============================
+   CONTENT AREA
+============================== */
+
+/* Old class name support (if still used) */
+.content-container,
+.portal-content {
+    padding-top: 80px;      /* space for fixed nav */
+    min-height: 100vh;
+    width: 95%;
+    max-width: 1200px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+/* Loading placeholder style */
+.loading-block,
+.portal-loading-block {
+    color: #b9bbbe;
+    text-align: center;
+    margin-top: 100px;
+}
+
+.loading-block i,
+.portal-loading-block i {
+    color: #5865F2;
+}
+
+.loading-block p,
+.portal-loading-block p {
+    margin-top: 20px;
+    font-weight: 500;
+    letter-spacing: 1px;
+}
+
+/* ==============================
+   LISTING PAGE FORM
+============================== */
+
+/* Main card */
+#myForm {
+    background: #202225;
+    border-radius: 12px;
+    padding: 20px 18px;
+    max-width: 640px;
+    margin: 40px auto 40px auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+    color: #fff;
+}
+
+#myForm h3 {
+    text-align: center;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+/* Labels & controls */
+#myForm label {
+    display: block;
+    margin: 10px 0 4px;
+    font-size: 0.9rem;
+    color: #b9bbbe;
+}
+
+#myForm input[type="text"],
+#myForm input[type="number"],
+#myForm select {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid #2f3136;
+    background: #18191c;
+    color: #fff;
+    font-size: 0.9rem;
+    outline: none;
+    box-sizing: border-box;
+}
+
+#myForm input[type="text"]:focus,
+#myForm input[type="number"]:focus,
+#myForm select:focus {
+    border-color: #5865F2;
+}
+
+/* Autocomplete */
+#myForm .autocomplete-wrapper {
+    position: relative;
+}
+
+#autocomplete-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 3px;
+    background: #2f3136;
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+    z-index: 20;
+}
+
+.autocomplete-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #26292e;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover {
+    background: #3a3f45;
+}
+
+/* Checkbox / qty list area (non-bundling) */
+#checkboxList {
+    margin-top: 10px;
+}
+
+/* ==============================
+   QTY CONTROL (+ / - BUTTONS)
+============================== */
+.qty-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.qty-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid #2f3136;
+    background: #18191c;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.qty-btn:hover {
+    background: #2b2d31;
+}
+
+/* Smaller number input */
+.item-qty {
+    width: 44px;
+    text-align: center;
+    background: #18191c;
+    border: 1px solid #2f3136;
+    border-radius: 6px;
+    color: white;
+    font-size: 0.8rem;
+    padding: 3px 2px;
+}
+
+/* hide default arrows on number input */
+.item-qty::-webkit-outer-spin-button,
+.item-qty::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.item-qty {
+    -moz-appearance: textfield;
+}
+
+/* Submit button */
+#submitBtn {
+    margin-top: 20px;
+    width: 100%;
+    padding: 10px 0;
+    border-radius: 8px;
+    border: none;
+    background: #5865F2;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.2s, transform 0.05s;
+}
+
+#submitBtn:hover {
+    background: #4752c4;
+}
+
+#submitBtn:active {
+    transform: scale(0.98);
+}
+
+#submitBtn:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+/* ==============================
+   RESPONSIVE (TABLET & MOBILE)
+============================== */
+@media (max-width: 768px) {
+    .portal-nav {
+        padding: 0 12px;
+    }
+
+    /* Hide ALL desktop nav info on mobile (links + user + buttons) */
+    .portal-nav-right {
+        display: none;
+    }
+
+    /* Show only hamburger on the right */
+    .portal-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .portal-content,
+    .content-container {
+        padding-top: 80px;
+        width: 100%;
+        margin: 0;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    #myForm {
+        margin: 110px auto 25px auto;   /* push form down away from nav */
+        padding: 16px 14px;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .portal-logout-btn {
+        padding: 0 10px;
+        font-size: 0.7rem;
+    }
+
+    #myForm {
+        margin-top: 120px;
+    }
+}
