@@ -42,7 +42,6 @@ export const HistoryPage = {
     const st = HistoryPage.state;
 
     const loadHistory = async () => {
-      // Kita ambil semua yang statusnya BUKAN pending
       const { data, error } = await supabase
         .from("orders")
         .select("*")
@@ -51,7 +50,6 @@ export const HistoryPage = {
 
       if (error) return console.error(error);
 
-      // --- LOGIC: REVENUE CALCULATION ---
       const revenue = data
         .filter((h) => h.status === "approved")
         .reduce(
@@ -64,14 +62,12 @@ export const HistoryPage = {
         "totalRevenue"
       ).innerText = `$${revenue.toLocaleString()}`;
 
-      // --- LOGIC: FILTERING ---
       const filtered = data.filter(
         (h) =>
           h.requested_by.toLowerCase().includes(st.searchQuery.toLowerCase()) ||
           h.item_name.toLowerCase().includes(st.searchQuery.toLowerCase())
       );
 
-      // --- LOGIC: PAGINATION ---
       const totalPages = Math.ceil(filtered.length / st.itemsPerPage) || 1;
       const paginatedData = filtered.slice(
         (st.currentPage - 1) * st.itemsPerPage,
@@ -117,9 +113,16 @@ export const HistoryPage = {
                         } <span style="color:#72767d;">x${
             h.quantity
           }</span></div>
-                        <div style="font-size:0.7rem; color:#5865F2; text-transform:uppercase; font-weight:bold;">${
-                          h.item_type
-                        }</div>
+                        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+                            <span style="font-size:0.6rem; color:#5865F2; text-transform:uppercase; font-weight:bold;">${
+                              h.item_type
+                            }</span>
+                            ${
+                              h.notes
+                                ? `<span style="font-size:0.65rem; color:#43b581; background:#43b58111; padding:1px 6px; border-radius:3px; border:1px solid #43b58133;">${h.notes}</span>`
+                                : ""
+                            }
+                        </div>
                     </td>
                     <td style="padding: 15px;">
                         <span style="color:${statusColor}; font-weight:bold; font-size:0.65rem; text-transform:uppercase; border:1px solid ${statusColor}44; padding:3px 10px; border-radius:4px; background:${statusColor}11;">
@@ -167,7 +170,6 @@ export const HistoryPage = {
       });
     };
 
-    // Event Search
     document.getElementById("histSearch").oninput = (e) => {
       st.searchQuery = e.target.value;
       st.currentPage = 1;
