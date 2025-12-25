@@ -87,46 +87,61 @@ export const OrdersPage = {
 
     const process = async (id, status) => {
       const order = OrdersPage.state.orders.find((o) => o.id == id);
+      let orderNotes = ""; // Untuk menyimpan catatan SN
 
       if (status === "approved") {
         if (order.item_type === "Weapon") {
-          // PERBAIKAN DI SINI: Mencari unit yang tersedia
           const { data: units, error } = await supabase
             .from("inventory_weapons")
-            .select("*")
+            .select("id, serial_number")
             .eq("weapon_name", order.item_name)
-            .is("hold_by", null) // Pastikan tidak ada yang pegang
-            .eq("status", "available") // Dan statusnya available
-            .limit(1);
+            .eq("status", "available")
+            .is("hold_by", null);
 
           if (error || !units || units.length === 0) {
             return Swal.fire(
               "Stok Kosong",
-              `Gudang tidak memiliki unit ${order.item_name} yang siap (Available).`,
+              `Tidak ada unit ${order.item_name} yang tersedia.`,
               "error"
             );
           }
 
-          const targetUnit = units[0];
-          // Update unit senjata tersebut
+          const { value: selectedUnitId } = await Swal.fire({
+            title: "Pilih Serial Number",
+            input: "select",
+            inputOptions: Object.fromEntries(
+              units.map((u) => [u.id, u.serial_number])
+            ),
+            inputPlaceholder: "--- Pilih SN ---",
+            showCancelButton: true,
+            background: "#2f3136",
+            color: "#fff",
+            inputValidator: (value) => {
+              if (!value) return "Pilih salah satu Serial Number!";
+            },
+          });
+
+          if (!selectedUnitId) return;
+
+          // Cari info SN untuk dicatat di order
+          const selectedUnit = units.find((u) => u.id == selectedUnitId);
+          orderNotes = `SN: ${selectedUnit.serial_number}`;
+
           await supabase
             .from("inventory_weapons")
-            .update({
-              status: "in_use",
-              hold_by: order.requested_by,
-            })
-            .eq("id", targetUnit.id);
+            .update({ status: "in_use", hold_by: order.requested_by })
+            .eq("id", selectedUnitId);
         } else {
-          // Logika untuk barang umum
           const { data: inv } = await supabase
             .from("inventory")
             .select("*")
             .eq("item_name", order.item_name)
             .single();
+
           if (!inv || inv.stock < order.quantity) {
             return Swal.fire(
               "Stok Kurang",
-              "Stok di Warehouse Inventory tidak mencukupi!",
+              "Stok di Warehouse tidak mencukupi!",
               "error"
             );
           }
@@ -137,10 +152,14 @@ export const OrdersPage = {
         }
       }
 
-      // Update status di tabel orders
+      // Update status di tabel orders + tambahkan SN ke kolom notes
       await supabase
         .from("orders")
-        .update({ status: status, processed_at: new Date().toISOString() })
+        .update({
+          status: status,
+          processed_at: new Date().toISOString(),
+          notes: orderNotes, // Menyimpan SN di sini
+        })
         .eq("id", id);
 
       Swal.fire({
