@@ -29,7 +29,11 @@ export const OrdersPage = {
         .map(
           (order) => `
                 <div style="background: #2f3136; border-radius: 12px; padding: 20px; border-left: 5px solid ${
-                  order.item_type === "Weapon" ? "#5865F2" : "#faa61a"
+                  order.item_type === "Weapon"
+                    ? "#5865F2"
+                    : order.item_type === "Bundling"
+                    ? "#9b59b6"
+                    : "#faa61a"
                 }; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <span style="font-size:0.65rem; background:#202225; padding:2px 6px; border-radius:4px; color:#b9bbbe; font-weight:bold;">${order.item_type.toUpperCase()}</span>
@@ -87,7 +91,7 @@ export const OrdersPage = {
 
     const process = async (id, status) => {
       const order = OrdersPage.state.orders.find((o) => o.id == id);
-      let orderNotes = ""; // Untuk menyimpan catatan SN
+      let orderNotes = "";
 
       if (status === "approved") {
         if (order.item_type === "Weapon") {
@@ -123,7 +127,6 @@ export const OrdersPage = {
 
           if (!selectedUnitId) return;
 
-          // Cari info SN untuk dicatat di order
           const selectedUnit = units.find((u) => u.id == selectedUnitId);
           orderNotes = `SN: ${selectedUnit.serial_number}`;
 
@@ -131,13 +134,66 @@ export const OrdersPage = {
             .from("inventory_weapons")
             .update({ status: "in_use", hold_by: order.requested_by })
             .eq("id", selectedUnitId);
+        }
+
+        // --- LOGIKA BUNDLING (SESUAI SCHEMA KAMU) ---
+        else if (order.item_type === "Bundling") {
+          const { data: recipe, error: recipeError } = await supabase
+            .from("bundle_items")
+            .select("nama_barang_stok, jumlah_potong") // Sesuai kolom schema kamu
+            .eq("nama_paket", order.item_name); // Sesuai kolom schema kamu
+
+          if (recipeError || !recipe || recipe.length === 0) {
+            console.error("Recipe Error:", recipeError);
+            return Swal.fire(
+              "Error",
+              `Resep untuk '${order.item_name}' tidak ditemukan di tabel bundle_items!`,
+              "error"
+            );
+          }
+
+          // Cek stok semua bahan
+          for (const item of recipe) {
+            const { data: inv } = await supabase
+              .from("inventory")
+              .select("stock")
+              .eq("item_name", item.nama_barang_stok)
+              .single();
+            const totalNeeded = item.jumlah_potong * order.quantity;
+            if (!inv || inv.stock < totalNeeded) {
+              return Swal.fire(
+                "Stok Kurang",
+                `Bahan '${
+                  item.nama_barang_stok
+                }' tidak cukup! (Butuh: ${totalNeeded}, Stok: ${
+                  inv?.stock || 0
+                })`,
+                "error"
+              );
+            }
+          }
+
+          // Eksekusi potong stok
+          for (const item of recipe) {
+            const { data: inv } = await supabase
+              .from("inventory")
+              .select("id, stock")
+              .eq("item_name", item.nama_barang_stok)
+              .single();
+            await supabase
+              .from("inventory")
+              .update({
+                stock: inv.stock - item.jumlah_potong * order.quantity,
+              })
+              .eq("id", inv.id);
+          }
+          orderNotes = `Bundling Approved: ${recipe.length} items deducted.`;
         } else {
           const { data: inv } = await supabase
             .from("inventory")
             .select("*")
             .eq("item_name", order.item_name)
             .single();
-
           if (!inv || inv.stock < order.quantity) {
             return Swal.fire(
               "Stok Kurang",
@@ -152,13 +208,12 @@ export const OrdersPage = {
         }
       }
 
-      // Update status di tabel orders + tambahkan SN ke kolom notes
       await supabase
         .from("orders")
         .update({
           status: status,
           processed_at: new Date().toISOString(),
-          notes: orderNotes, // Menyimpan SN di sini
+          notes: orderNotes,
         })
         .eq("id", id);
 
