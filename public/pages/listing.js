@@ -59,13 +59,20 @@ export const ListingPage = {
     let dbBundles = [];
     let fullKatalog = [];
 
-    const { data: pkgData } = await supabase.from("master_paket").select("*");
+    // --- LOAD DATA AWAL ---
+    const { data: pkgData, error: pkgError } = await supabase
+      .from("master_paket")
+      .select("*");
     const { data: katData, error: katError } = await supabase
       .from("katalog_barang")
-      .select("nama_barang, jenis_barang, harga_satuan, status"); // SUDAH DIPERBAIKI
+      .select("nama_barang, jenis_barang, harga_satuan, status");
 
+    if (pkgError) console.error("Error load paket:", pkgError);
     if (katError) console.error("Error load katalog:", katError);
+
+    dbBundles = pkgData || []; // Mengisi list paket agar tidak kosong
     fullKatalog = katData || [];
+
     const updateTotalPrice = () => {
       let total = 0;
       if (tipeSelect.value === "Bundling") {
@@ -145,25 +152,82 @@ export const ListingPage = {
 
       if (tipe === "Bundling" && subTipe) {
         const selected = dbBundles.find((p) => p.nama_paket === subTipe);
-        infoDisplay.innerText = selected
-          ? `Isi: ${selected.deskripsi_isi}`
-          : "Detail tidak ditemukan";
-        infoDisplay.style.display = "block";
+        if (selected) {
+          infoDisplay.style.display = "block";
+          infoDisplay.innerHTML =
+            "<span style='color:#72767d;'>Memvalidasi stok bahan paket...</span>";
+
+          try {
+            const { data: resep } = await supabase
+              .from("bundle_items")
+              .select("nama_barang_stok, jumlah_potong")
+              .eq("nama_paket", subTipe);
+            const [resWep, resGen] = await Promise.all([
+              supabase
+                .from("inventory_weapons")
+                .select("weapon_name")
+                .ilike("status", "%available%")
+                .is("hold_by", null),
+              supabase.from("inventory").select("item_name, stock"),
+            ]);
+
+            let isSafe = true;
+            let detailStatus = "";
+
+            if (resep && resep.length > 0) {
+              resep.forEach((item) => {
+                const target = item.nama_barang_stok;
+                const butuh = item.jumlah_potong;
+                let punya = 0;
+
+                const isWeapon =
+                  fullKatalog.find((k) => k.nama_barang === target)
+                    ?.jenis_barang === "Weapon";
+                if (isWeapon) {
+                  punya = resWep.data
+                    ? resWep.data.filter((w) => w.weapon_name === target).length
+                    : 0;
+                } else {
+                  punya = resGen.data
+                    ? resGen.data.find((g) => g.item_name === target)?.stock ||
+                      0
+                    : 0;
+                }
+
+                if (punya < butuh) {
+                  isSafe = false;
+                  detailStatus += `<li style="color:#ed4245;">${target}: Kurang ${
+                    butuh - punya
+                  } (Stok: ${punya}/${butuh})</li>`;
+                } else {
+                  detailStatus += `<li style="color:#43b581;">${target}: Aman (${punya}/${butuh})</li>`;
+                }
+              });
+
+              if (isSafe) {
+                infoDisplay.innerHTML = `<strong style="color:#43b581;">✓ Stok Tersedia</strong><ul style="margin:5px 0; padding-left:15px; font-size:0.75rem;">${detailStatus}</ul><p style="font-size:0.7rem;">Isi: ${selected.deskripsi_isi}</p>`;
+                finalContainer.style.display = "block";
+              } else {
+                infoDisplay.innerHTML = `<strong style="color:#ed4245;">✗ Stok Bahan Tidak Cukup</strong><ul style="margin:5px 0; padding-left:15px; font-size:0.75rem;">${detailStatus}</ul>`;
+                finalContainer.style.display = "none";
+              }
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
         checkList.innerHTML = "";
-        finalContainer.style.display = "block";
         updateTotalPrice();
       } else if (tipe === "Non Bundling" && subTipe) {
         finalContainer.style.display = "block";
         checkList.innerHTML =
           "<p style='color:#72767d; font-size:0.8rem;'>Sinkronisasi gudang...</p>";
-
         let filterJenis =
           subTipe === "Vest ammo weapon"
             ? ["Vest", "Ammo", "Weapon"]
             : ["Attachment"];
 
         try {
-          // 1. Ambil data dari semua tabel secara paralel
           const [resWep, resGen] = await Promise.all([
             supabase
               .from("inventory_weapons")
@@ -173,29 +237,21 @@ export const ListingPage = {
             supabase.from("inventory").select("item_name, stock"),
           ]);
 
-          console.log("Data Senjata di Gudang:", resWep.data);
-          console.log("Data Barang di Gudang:", resGen.data);
-          console.log("Isi Katalog Saat Ini:", fullKatalog);
-
-          // 2. Filter katalog yang statusnya Ready
           const items = fullKatalog.filter(
             (k) => filterJenis.includes(k.jenis_barang) && k.status === "Ready"
           );
-
           checkList.innerHTML = "";
 
           const availableItems = items
             .map((item) => {
               let actualStock = 0;
               if (item.jenis_barang === "Weapon") {
-                // Pastikan nama_barang di katalog SAMA PERSIS dengan weapon_name di inventory_weapons
                 actualStock = resWep.data
                   ? resWep.data.filter(
                       (w) => w.weapon_name === item.nama_barang
                     ).length
                   : 0;
               } else {
-                // Pastikan nama_barang di katalog SAMA PERSIS dengan item_name di inventory
                 const invRecord = resGen.data
                   ? resGen.data.find((g) => g.item_name === item.nama_barang)
                   : null;
@@ -204,8 +260,6 @@ export const ListingPage = {
               return { ...item, actualStock };
             })
             .filter((item) => item.actualStock > 0);
-
-          console.log("Item yang lolos filter stok:", availableItems);
 
           if (availableItems.length > 0) {
             availableItems.forEach((item) => {
@@ -238,12 +292,10 @@ export const ListingPage = {
               .forEach((input) => (input.oninput = updateTotalPrice));
           } else {
             checkList.innerHTML =
-              "<p style='font-size:0.8rem; color:#ed4245;'>Maaf, stok item di kategori ini tidak ditemukan atau kosong di gudang.</p>";
+              "<p style='font-size:0.8rem; color:#ed4245;'>Stok kosong di gudang.</p>";
           }
         } catch (err) {
-          console.error("Error Detail:", err);
-          checkList.innerHTML =
-            "<p style='font-size:0.8rem; color:#ed4245;'>Gagal memuat data stok.</p>";
+          console.error(err);
         }
         updateTotalPrice();
       }
@@ -270,19 +322,16 @@ export const ListingPage = {
           total_price: totalDisplay.innerText,
         });
       } else {
-        const itemElements = document.querySelectorAll(".item-qty");
-        itemElements.forEach((el) => {
+        document.querySelectorAll(".item-qty").forEach((el) => {
           const qty = parseInt(el.value);
           if (qty > 0) {
             const matchKatalog = fullKatalog.find(
               (k) => k.nama_barang === el.dataset.name
             );
-            const type = matchKatalog ? matchKatalog.jenis_barang : "General";
-
             requests.push({
               requested_by: namaMember,
               item_name: el.dataset.name,
-              item_type: type,
+              item_type: matchKatalog ? matchKatalog.jenis_barang : "General",
               quantity: qty,
               status: "pending",
               total_price: `$${(
@@ -330,31 +379,30 @@ export const ListingPage = {
     };
 
     document.addEventListener("click", (e) => {
-      if (e.target.classList.contains("plus")) {
-        const input = e.target
-          .closest(".qty-control")
-          .querySelector(".item-qty");
-        const maxVal = parseInt(input.getAttribute("max") || 999);
-        if (Number(input.value) < maxVal) {
-          input.value = Number(input.value || 0) + 1;
-          input.dispatchEvent(new Event("input"));
-        } else {
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            title: "Stok terbatas!",
-            icon: "warning",
-            timer: 1000,
-            showConfirmButton: false,
-          });
-        }
-      }
-      if (e.target.classList.contains("minus")) {
+      if (
+        e.target.classList.contains("plus") ||
+        e.target.classList.contains("minus")
+      ) {
         const input = e.target
           .closest(".qty-control")
           .querySelector(".item-qty");
         const current = Number(input.value || 0);
-        if (current > Number(input.min || 0)) {
+        if (e.target.classList.contains("plus")) {
+          const maxVal = parseInt(input.getAttribute("max") || 999);
+          if (current < maxVal) {
+            input.value = current + 1;
+            input.dispatchEvent(new Event("input"));
+          } else {
+            Swal.fire({
+              toast: true,
+              position: "top-end",
+              title: "Stok terbatas!",
+              icon: "warning",
+              timer: 1000,
+              showConfirmButton: false,
+            });
+          }
+        } else if (current > 0) {
           input.value = current - 1;
           input.dispatchEvent(new Event("input"));
         }
