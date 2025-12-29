@@ -7,16 +7,14 @@ export const StokPage = {
     sortField: "item_name",
     sortAsc: true,
     isSaving: false,
-    allData: [], // Cache data untuk sorting & filter cepat
+    allData: [],
   },
 
   render: () => `
         <div class="header-container">
             <h2>Warehouse Inventory</h2>
         </div>
-
         <div id="invStats" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px;"></div>
-
         <div style="background: #2f3136; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); border-top: 4px solid #43b581;">
             <h4 id="formTitle" style="margin-top:0; color:#fff;">Update / Tambah Barang</h4>
             <div style="display: grid; grid-template-columns: 2fr 1.5fr auto; gap: 15px; align-items: end;">
@@ -31,7 +29,6 @@ export const StokPage = {
                 <button id="btnSaveStok" style="background:#43b581; padding: 0 30px; font-weight:bold; height:42px; color:white; border:none; border-radius:5px; cursor:pointer;">SIMPAN</button>
             </div>
         </div>
-
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 15px;">
              <div style="position:relative; flex: 1;">
                 <i class="fas fa-search" style="position:absolute; left:15px; top:12px; color:#4f545c;"></i>
@@ -44,7 +41,6 @@ export const StokPage = {
                 <option value="healthy">Stok Aman (>5)</option>
              </select>
         </div>
-
         <div style="background: #2f3136; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
             <table style="width: 100%; border-collapse: collapse; font-size:0.9rem;">
                 <thead>
@@ -58,11 +54,13 @@ export const StokPage = {
                 <tbody id="stokTableBody"></tbody>
             </table>
         </div>
-
         <div id="stokPagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 25px; align-items: center;"></div>
     `,
 
-  init: async (supabase) => {
+  init: async (supabase, userData) => {
+    // PROTEKSI: Jika userData belum siap, jangan jalankan fungsi
+    if (!userData) return;
+
     const st = StokPage.state;
     const selectDropdown = document.getElementById("itemNameSelection");
     const tableBody = document.getElementById("stokTableBody");
@@ -110,7 +108,6 @@ export const StokPage = {
         return matchesSearch && matchesFilter;
       });
 
-      // Sorting Logic
       filtered.sort((a, b) => {
         let valA =
           st.sortField === "stock" ? a.stock : a.item_name.toLowerCase();
@@ -126,7 +123,6 @@ export const StokPage = {
         (st.currentPage - 1) * st.itemsPerPage,
         st.currentPage * st.itemsPerPage
       );
-
       renderStats(st.allData);
       renderTable(paginated);
       renderPagination(totalPages);
@@ -134,7 +130,9 @@ export const StokPage = {
 
     const renderStats = (data) => {
       const low = data.filter((i) => i.stock <= 5).length;
-      document.getElementById("invStats").innerHTML = `
+      const statsEl = document.getElementById("invStats");
+      if (!statsEl) return;
+      statsEl.innerHTML = `
                 <div style="background:#23272a; padding:15px; border-radius:10px; border-bottom:3px solid #5865F2;">
                     <div style="font-size:0.7rem; color:#b9bbbe; text-transform:uppercase;">Total Jenis Barang</div>
                     <div style="font-size:1.5rem; font-weight:bold; color:white;">${
@@ -183,14 +181,15 @@ export const StokPage = {
                         }" style="background:#5865F2; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-edit"></i></button>
                         <button class="btn-delete-stok" data-id="${
                           item.id
-                        }" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                        }" data-name="${
+            item.item_name
+          }" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`
         )
         .join("");
     };
 
-    // --- EVENT DELEGATION: TABLE ---
     tableBody.onclick = async (e) => {
       const editBtn = e.target.closest(".btn-edit-stok");
       const deleteBtn = e.target.closest(".btn-delete-stok");
@@ -204,6 +203,7 @@ export const StokPage = {
           btnSave.style.background = "#faa61a";
           btnSave.dataset.mode = "edit";
           btnSave.dataset.id = item.id;
+          btnSave.dataset.oldQty = item.stock;
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
       }
@@ -218,11 +218,18 @@ export const StokPage = {
           color: "#fff",
         });
         if (isConfirmed) {
-          await supabase
+          const { error } = await supabase
             .from("inventory")
             .delete()
             .eq("id", deleteBtn.dataset.id);
-          loadStok();
+          if (!error) {
+            window.createAuditLog(
+              "DELETE",
+              "inventory",
+              `Menghapus item ${deleteBtn.dataset.name} dari inventory`
+            );
+            loadStok();
+          }
         }
       }
     };
@@ -257,7 +264,6 @@ export const StokPage = {
       paginationContainer.innerHTML = html;
     };
 
-    // --- EVENT DELEGATION: PAGINATION ---
     paginationContainer.onclick = (e) => {
       const btn = e.target.closest(".pg-nav");
       if (btn && !btn.disabled) {
@@ -287,29 +293,49 @@ export const StokPage = {
         try {
           st.isSaving = true;
           if (btnSave.dataset.mode === "edit") {
-            await supabase
+            const { error } = await supabase
               .from("inventory")
               .update({ item_name: name, stock })
               .eq("id", btnSave.dataset.id);
+            if (!error) {
+              window.createAuditLog(
+                "UPDATE",
+                "inventory",
+                `Mengubah stok ${name}: ${btnSave.dataset.oldQty} -> ${stock}`
+              );
+            }
             delete btnSave.dataset.mode;
+            delete btnSave.dataset.oldQty;
             btnSave.innerText = "SIMPAN";
             btnSave.style.background = "#43b581";
           } else {
-            // Logic UPSERT (Tambah stok jika item sudah ada)
             const { data: existing } = await supabase
               .from("inventory")
               .select("*")
               .eq("item_name", name)
               .single();
             if (existing) {
-              await supabase
+              const newTotal = existing.stock + stock;
+              const { error } = await supabase
                 .from("inventory")
-                .update({ stock: existing.stock + stock })
+                .update({ stock: newTotal })
                 .eq("id", existing.id);
+              if (!error)
+                window.createAuditLog(
+                  "UPDATE",
+                  "inventory",
+                  `Menambah stok ${name}: +${stock} (Total: ${newTotal})`
+                );
             } else {
-              await supabase
+              const { error } = await supabase
                 .from("inventory")
                 .insert([{ item_name: name, stock }]);
+              if (!error)
+                window.createAuditLog(
+                  "CREATE",
+                  "inventory",
+                  `Input stok awal ${name}: ${stock} unit`
+                );
             }
           }
           inputQty.value = "";
@@ -328,7 +354,6 @@ export const StokPage = {
       }
     };
 
-    // --- FILTER & SEARCH ---
     document.getElementById("invSearch").oninput = (e) => {
       st.searchQuery = e.target.value;
       st.currentPage = 1;

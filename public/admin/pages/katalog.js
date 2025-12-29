@@ -11,12 +11,15 @@ export const KatalogPage = {
   render: () => `
         <div class="header-container">
             <h2>Katalog Master Barang</h2>
+            <p style="color: #b9bbbe; margin-top: -10px; font-size: 0.9rem;">Kelola daftar harga dan status ketersediaan barang organisasi.</p>
         </div>
 
         <div id="katStats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px;"></div>
         
         <div style="background: #2f3136; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); border-top: 4px solid #5865F2;">
-            <h4 id="formTitle" style="margin-top:0; color:#fff;">Tambah Barang Baru</h4>
+            <h4 id="formTitle" style="margin-top:0; color:#fff; display:flex; align-items:center; gap:10px;">
+                <i class="fas fa-box-open" style="color:#5865F2;"></i> Tambah Barang Baru
+            </h4>
             <div style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr auto; gap: 15px; align-items: end;">
                 <div>
                     <label style="font-size:0.75rem; color:#b9bbbe; font-weight:bold;">NAMA BARANG</label>
@@ -43,16 +46,19 @@ export const KatalogPage = {
                         <option value="Not Ready">Not Ready</option>
                     </select>
                 </div>
-                <button id="btnSaveKatalog" style="background:#5865F2; padding: 10px 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">SIMPAN</button>
+                <button id="btnSaveKatalog" style="background:#5865F2; padding: 0 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">SIMPAN</button>
             </div>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
              <h4 style="margin:0; color:#b9bbbe;">Daftar Katalog</h4>
-             <input type="text" id="katSearch" placeholder="Cari nama barang..." style="width: 280px; padding: 10px 15px; background:#202225; color:white; border-radius:20px; border:1px solid #4f545c;">
+             <div style="position:relative;">
+                <i class="fas fa-search" style="position:absolute; left:12px; top:11px; color:#4f545c;"></i>
+                <input type="text" id="katSearch" placeholder="Cari nama barang..." style="width: 280px; padding: 8px 15px 8px 35px; background:#202225; color:white; border-radius:20px; border:1px solid #4f545c;">
+             </div>
         </div>
 
-        <div style="background: #2f3136; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+        <div style="background: #2f3136; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #40444b;">
             <table style="width: 100%; border-collapse: collapse; font-size:0.9rem;">
                 <thead>
                     <tr style="background: #202225; text-align: left; color:#b9bbbe;">
@@ -70,7 +76,7 @@ export const KatalogPage = {
         <div id="katPagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 25px; align-items: center;"></div>
     `,
 
-  init: async (supabase) => {
+  init: async (supabase, userData) => {
     const st = KatalogPage.state;
     const btnSave = document.getElementById("btnSaveKatalog");
     const inputNama = document.getElementById("katNama");
@@ -150,10 +156,12 @@ export const KatalogPage = {
                     <td style="padding: 15px; text-align: center;">
                         <button class="btn-edit-kat" data-id="${
                           item.id
-                        }" style="background:#faa61a; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-edit"></i></button>
+                        }" style="background:#faa61a; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer; margin-right:5px;"><i class="fas fa-edit"></i></button>
                         <button class="btn-delete-kat" data-id="${
                           item.id
-                        }" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                        }" data-nama="${
+            item.nama_barang
+          }" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`
         )
@@ -176,28 +184,38 @@ export const KatalogPage = {
           btnSave.style.background = "#faa61a";
           btnSave.dataset.mode = "edit";
           btnSave.dataset.id = item.id;
-          document.getElementById("formTitle").innerText =
-            "Edit Barang: " + item.nama_barang;
+          document.getElementById(
+            "formTitle"
+          ).innerHTML = `<i class="fas fa-edit" style="color:#faa61a;"></i> Edit Barang: ${item.nama_barang}`;
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
       }
 
       if (deleteBtn) {
+        const { id, nama } = deleteBtn.dataset;
         const { isConfirmed } = await Swal.fire({
           title: "Hapus Barang?",
-          text: "Barang ini akan hilang dari Warehouse & Listing.",
+          text: `"${nama}" akan hilang dari katalog master.`,
           icon: "warning",
           showCancelButton: true,
           confirmButtonColor: "#ed4245",
+          cancelButtonColor: "#4f545c",
           background: "#2f3136",
           color: "#fff",
         });
         if (isConfirmed) {
-          await supabase
+          const { error } = await supabase
             .from("katalog_barang")
             .delete()
-            .eq("id", deleteBtn.dataset.id);
-          loadKatalog();
+            .eq("id", id);
+          if (!error) {
+            window.createAuditLog(
+              "DELETE",
+              "katalog_barang",
+              `Menghapus item dari katalog: ${nama}`
+            );
+            loadKatalog();
+          }
         }
       }
     };
@@ -265,6 +283,7 @@ export const KatalogPage = {
         icon: "question",
         showCancelButton: true,
         confirmButtonColor: isEdit ? "#faa61a" : "#5865F2",
+        cancelButtonColor: "#4f545c",
         background: "#2f3136",
         color: "#fff",
       });
@@ -279,13 +298,28 @@ export const KatalogPage = {
               .from("katalog_barang")
               .update(payload)
               .eq("id", btnSave.dataset.id);
+            window.createAuditLog(
+              "UPDATE",
+              "katalog_barang",
+              `Update katalog: ${
+                payload.nama_barang
+              } ($${payload.harga_satuan.toLocaleString()})`
+            );
+
+            // Reset UI State
             btnSave.innerText = "SIMPAN";
             btnSave.style.background = "#5865F2";
             delete btnSave.dataset.mode;
-            document.getElementById("formTitle").innerText =
-              "Tambah Barang Baru";
+            document.getElementById(
+              "formTitle"
+            ).innerHTML = `<i class="fas fa-box-open" style="color:#5865F2;"></i> Tambah Barang Baru`;
           } else {
             await supabase.from("katalog_barang").insert([payload]);
+            window.createAuditLog(
+              "CREATE",
+              "katalog_barang",
+              `Menambah item katalog: ${payload.nama_barang} (${payload.jenis_barang})`
+            );
           }
 
           Swal.fire({

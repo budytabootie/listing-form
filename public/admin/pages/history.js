@@ -5,7 +5,7 @@ export const HistoryPage = {
     currentPage: 1,
     itemsPerPage: 10,
     allData: [],
-    searchTimeout: null, // Untuk debouncing
+    searchTimeout: null,
   },
 
   render: () => `
@@ -47,11 +47,10 @@ export const HistoryPage = {
     const st = HistoryPage.state;
 
     const loadHistory = async () => {
-      // Optimalisasi 4: Hanya ambil kolom yang diperlukan (Select Specific Columns)
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "processed_at, created_at, requested_by, item_name, quantity, item_type, notes, status, total_price, processed_by"
+          "id, processed_at, created_at, requested_by, item_name, quantity, item_type, notes, status, total_price, processed_by_name"
         )
         .neq("status", "pending")
         .order("processed_at", { ascending: false });
@@ -67,7 +66,6 @@ export const HistoryPage = {
       const revenue = data
         .filter((h) => h.status === "approved")
         .reduce((sum, h) => {
-          // Robust Price Parsing
           const price =
             typeof h.total_price === "string"
               ? parseFloat(h.total_price.replace(/[^-0-9.]/g, ""))
@@ -77,7 +75,7 @@ export const HistoryPage = {
 
       document.getElementById(
         "totalRevenue"
-      ).innerText = `$${revenue.toLocaleString()}`;
+      ).innerText = `Rp ${revenue.toLocaleString()}`;
     };
 
     const refreshUI = () => {
@@ -114,7 +112,9 @@ export const HistoryPage = {
           const date = new Date(h.processed_at || h.created_at);
 
           return `
-            <tr style="border-bottom: 1px solid #40444b;" class="hist-row">
+            <tr style="border-bottom: 1px solid #40444b; cursor:pointer;" class="hist-row" onclick="window.viewHistoryDetail('${
+              h.id
+            }')">
                 <td style="padding: 15px; font-size: 0.8rem; color: #b9bbbe;">
                     ${date.toLocaleString("id-ID", {
                       day: "2-digit",
@@ -139,15 +139,83 @@ export const HistoryPage = {
                         ${h.status}
                     </span>
                 </td>
-                <td style="padding: 15px; color: #43b581; font-weight: bold;">${
-                  h.total_price || "$0"
-                }</td>
-                <td style="padding: 15px; color: #72767d; font-size: 0.8rem;">${
-                  h.processed_by || "System"
-                }</td>
+                <td style="padding: 15px; color: #43b581; font-weight: bold;">Rp ${(
+                  h.total_price || 0
+                ).toLocaleString()}</td>
+                <td style="padding: 15px; color: #72767d; font-size: 0.8rem;">
+                  ${h.processed_by_name || (h.status === "approved" ? "Staff" : "-")}
+                </td>
             </tr>`;
         })
         .join("");
+    };
+
+    // --- FITUR BARU: MODAL DETAIL ---
+    window.viewHistoryDetail = (id) => {
+      const order = st.allData.find((h) => h.id == id);
+      if (!order) return;
+
+      Swal.fire({
+        title: `<span style="color: #fff;">Detail Riwayat</span>`,
+        background: "#2f3136",
+        color: "#fff",
+        width: "500px",
+        html: `
+            <div style="text-align: left; font-size: 0.9rem; line-height: 1.6;">
+                <div style="background: #202225; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 15px;">
+                    <p style="margin:0;"><small style="color:#b9bbbe;">Item yang Dipesan:</small></p>
+                    <p style="margin:5px 0; font-size:1.1rem;"><strong>${
+                      order.item_name
+                    }</strong> <span style="color:#43b581;">x${
+          order.quantity
+        }</span></p>
+                    <p style="margin:0;"><span style="font-size:0.7rem; background:#5865F2; padding:2px 6px; border-radius:4px;">${
+                      order.item_type
+                    }</span></p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div style="background: #202225; padding: 10px; border-radius: 8px; border: 1px solid #444;">
+                        <small style="color: #b9bbbe;">Dipesan Oleh:</small><br>
+                        <strong>${order.requested_by}</strong>
+                    </div>
+                    <div style="background: #202225; padding: 10px; border-radius: 8px; border: 1px solid #444;">
+                        <small style="color: #b9bbbe;">Di-approve Oleh:</small><br>
+                        <strong>${order.processed_by_name || "System"}</strong>
+                    </div>
+                </div>
+
+                <div style="background: #202225; padding: 15px; border-radius: 8px; border: 1px solid #444; margin-bottom: 15px;">
+                    <p style="margin:0; display:flex; justify-content:space-between;">
+                        <span style="color:#b9bbbe;">Total Tagihan:</span>
+                        <span style="color:#43b581; font-weight:bold; font-size:1.1rem;">Rp ${(
+                          order.total_price || 0
+                        ).toLocaleString()}</span>
+                    </p>
+                </div>
+
+                <div style="background: #202225; padding: 10px; border-radius: 8px; border: 1px solid #444;">
+                    <p style="margin: 0;"><small style="color: #b9bbbe;">Catatan / Serial Number:</small></p>
+                    <p style="margin: 5px 0 0 0; color: #fff; font-family: monospace; background:#111; padding:5px; border-radius:4px;">${
+                      order.notes || "Tidak ada catatan"
+                    }</p>
+                </div>
+                
+                ${
+                  order.item_type === "Bundling"
+                    ? `
+                    <div style="margin-top: 15px; padding:10px; background:#5865f211; border:1px dashed #5865f244; border-radius:8px; font-size: 0.75rem; color: #b9bbbe; display:flex; gap:10px; align-items:center;">
+                        <i class="fas fa-info-circle" style="color:#5865f2; font-size:1rem;"></i>
+                        <span>Item ini adalah paket bundling. Stok barang penyusun telah dipotong secara otomatis saat order disetujui.</span>
+                    </div>
+                `
+                    : ""
+                }
+            </div>
+        `,
+        confirmButtonText: "Tutup",
+        confirmButtonColor: "#4f545c",
+      });
     };
 
     const renderPagination = (totalPages) => {
@@ -156,9 +224,7 @@ export const HistoryPage = {
         container.innerHTML = "";
         return;
       }
-
       const curr = st.currentPage;
-      // Style dasar yang disamakan dengan BundlePage
       const baseStyle = `border:none; color:white; padding:8px 12px; margin:0 2px; border-radius:6px; cursor:pointer; font-size:0.8rem; transition:all 0.2s; display:flex; align-items:center; justify-content:center; min-width:35px;`;
       const navStyle = `background: #202225; color: #b9bbbe;`;
 
@@ -168,7 +234,6 @@ export const HistoryPage = {
 
       let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">`;
 
-      // Tombol First & Prev
       html += `
         <button class="pg-nav" data-page="1" ${
           curr === 1
@@ -186,7 +251,6 @@ export const HistoryPage = {
         </button>
       `;
 
-      // Nomor Halaman (Smart Range)
       for (let i = start; i <= end; i++) {
         const isActive = i === curr;
         html += `<button class="pg-nav" data-page="${i}" style="${baseStyle} background:${
@@ -200,7 +264,6 @@ export const HistoryPage = {
         </button>`;
       }
 
-      // Tombol Next & Last
       html += `
         <button class="pg-nav" data-page="${curr + 1}" ${
         curr === totalPages
@@ -219,7 +282,6 @@ export const HistoryPage = {
       </div>`;
 
       container.innerHTML = html;
-
       container.querySelectorAll(".pg-nav").forEach((btn) => {
         btn.onclick = () => {
           if (btn.disabled || btn.style.opacity === "0.2") return;
@@ -229,7 +291,6 @@ export const HistoryPage = {
       });
     };
 
-    // --- Optimalisasi 1: Debounced Search ---
     document.getElementById("histSearch").oninput = (e) => {
       clearTimeout(st.searchTimeout);
       st.searchTimeout = setTimeout(() => {

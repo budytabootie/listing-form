@@ -10,7 +10,6 @@ export const BundlePage = {
     <div class="header-container">
         <h2>Bundle Management</h2>
     </div>
-    
     <div style="background: #2f3136; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
         <h4 style="margin-top:0; color:#fff; display:flex; align-items:center; gap:10px;">
             <i class="fas fa-box-open" style="color:#5865F2;"></i> Buat / Edit Paket Master
@@ -30,14 +29,11 @@ export const BundlePage = {
             </div>
             <button id="btnSavePkg" style="background:#5865F2; padding: 10px 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">SIMPAN</button>
         </div>
-
         <div style="height: 1px; background: linear-gradient(90deg, #5865F2, transparent); margin-bottom: 20px;"></div>
-
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
              <h4 style="margin:0">Daftar Paket</h4>
              <input type="text" id="pkgSearch" placeholder="Cari paket..." style="width: 250px; padding: 8px 15px; background:#202225; color:white; border-radius:20px; border:1px solid #4f545c;">
         </div>
-
         <div style="background:#202225; border-radius:8px; overflow:hidden;">
             <table style="width:100%; border-collapse: collapse; font-size:0.85rem;">
                 <thead>
@@ -54,7 +50,6 @@ export const BundlePage = {
         </div>
         <div id="pkgPagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 20px; align-items: center;"></div>
     </div>
-
     <div style="background: #2f3136; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
         <h4 style="margin-top:0; color:#fff; display:flex; align-items:center; gap:10px;">
             <i class="fas fa-scroll" style="color:#43b581;"></i> Isi Item (Resep Potong Stok)
@@ -74,12 +69,10 @@ export const BundlePage = {
             </div>
             <button id="btnAddRes" style="background:#43b581; padding: 10px 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">TAMBAH</button>
         </div>
-
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
              <h4 style="margin:0">Daftar Resep</h4>
              <input type="text" id="resSearch" placeholder="Cari paket/item..." style="width: 250px; padding: 8px 15px; background:#202225; color:white; border-radius:20px; border:1px solid #4f545c;">
         </div>
-
         <div style="background:#202225; border-radius:8px; overflow:hidden;">
             <table style="width:100%; border-collapse: collapse; font-size:0.85rem;">
                 <thead>
@@ -97,7 +90,10 @@ export const BundlePage = {
     </div>
   `,
 
-  init: async (supabase) => {
+  init: async (supabase, userData) => {
+    // PROTEKSI: Jika userData null, jangan jalankan kode di bawahnya
+    if (!userData) return;
+
     const st = BundlePage.state;
     const els = {
       pkgBody: document.getElementById("pkgListTableBody"),
@@ -108,42 +104,29 @@ export const BundlePage = {
       resSearch: document.getElementById("resSearch"),
     };
 
-    // FUNGSI PAGINATION AESTHETIC (KEMBALI KE VERSI LENGKAP)
     const renderAestheticPagination = (id, totalPages, stateObj) => {
       const container = document.getElementById(id);
       if (!container || totalPages <= 1) {
-        container.innerHTML = "";
+        if (container) container.innerHTML = "";
         return;
       }
-
       const currentPage = stateObj.currentPage;
       const baseStyle = `border:none; color:white; padding:8px 12px; margin:0 2px; border-radius:6px; cursor:pointer; font-size:0.8rem; transition:all 0.2s; display:flex; align-items:center; justify-content:center; min-width:35px;`;
       const navStyle = `background: #202225; color: #b9bbbe;`;
-
       let start = Math.max(1, currentPage - 1);
       let end = Math.min(totalPages, start + 2);
       if (end - start < 2) start = Math.max(1, end - 2);
-
       let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f;">`;
-
-      // Tombol First & Prev
-      html += `
-        <button class="pg-btn" data-page="1" ${
-          currentPage === 1
-            ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
-            : 'style="' + baseStyle + navStyle + '"'
-        }>
-          <i class="fas fa-angles-left"></i>
-        </button>
-        <button class="pg-btn" data-page="${currentPage - 1}" ${
+      html += `<button class="pg-btn" data-page="1" ${
         currentPage === 1
           ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
           : 'style="' + baseStyle + navStyle + '"'
-      }>
-          <i class="fas fa-chevron-left"></i>
-        </button>
-      `;
-
+      }><i class="fas fa-angles-left"></i></button>
+               <button class="pg-btn" data-page="${currentPage - 1}" ${
+        currentPage === 1
+          ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
+          : 'style="' + baseStyle + navStyle + '"'
+      }><i class="fas fa-chevron-left"></i></button>`;
       for (let i = start; i <= end; i++) {
         const isActive = i === currentPage;
         html += `<button class="pg-btn" data-page="${i}" style="${baseStyle} background:${
@@ -152,29 +135,18 @@ export const BundlePage = {
           isActive
             ? "box-shadow: 0 4px 12px rgba(88,101,242,0.4); border:1px solid white;"
             : ""
-        }">
-          ${i}
-        </button>`;
+        }"> ${i} </button>`;
       }
-
-      // Tombol Next & Last
-      html += `
-        <button class="pg-btn" data-page="${currentPage + 1}" ${
+      html += `<button class="pg-btn" data-page="${currentPage + 1}" ${
         currentPage === totalPages
           ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
           : 'style="' + baseStyle + navStyle + '"'
-      }>
-          <i class="fas fa-chevron-right"></i>
-        </button>
-        <button class="pg-btn" data-page="${totalPages}" ${
+      }><i class="fas fa-chevron-right"></i></button>
+               <button class="pg-btn" data-page="${totalPages}" ${
         currentPage === totalPages
           ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
           : 'style="' + baseStyle + navStyle + '"'
-      }>
-          <i class="fas fa-angles-right"></i>
-        </button>
-      </div>`;
-
+      }><i class="fas fa-angles-right"></i></button></div>`;
       container.innerHTML = html;
       container.querySelectorAll(".pg-btn").forEach((btn) => {
         btn.onclick = () => {
@@ -216,11 +188,11 @@ export const BundlePage = {
         .order("nama_paket");
       const { data: recipes } = await supabase.from("bundle_items").select("*");
 
-      // Render Paket Table
       const fPkgs = (pkgs || []).filter((p) =>
         p.nama_paket.toLowerCase().includes(st.paket.searchQuery.toLowerCase())
       );
       const pkgPages = Math.ceil(fPkgs.length / st.paket.itemsPerPage) || 1;
+
       els.pkgBody.innerHTML = fPkgs
         .slice(
           (st.paket.currentPage - 1) * st.paket.itemsPerPage,
@@ -257,9 +229,9 @@ export const BundlePage = {
         </tr>`
         )
         .join("");
+
       renderAestheticPagination("pkgPagination", pkgPages, st.paket);
 
-      // Render Resep Table
       const fRes = (recipes || []).filter(
         (r) =>
           r.nama_paket
@@ -270,6 +242,7 @@ export const BundlePage = {
             .includes(st.resep.searchQuery.toLowerCase())
       );
       const resPages = Math.ceil(fRes.length / st.resep.itemsPerPage) || 1;
+
       els.resBody.innerHTML = fRes
         .slice(
           (st.resep.currentPage - 1) * st.resep.itemsPerPage,
@@ -282,25 +255,35 @@ export const BundlePage = {
             <td style="padding:15px; color:#b9bbbe;">${r.nama_barang_stok}</td>
             <td style="padding:15px; font-weight:bold; color:white;">${r.jumlah_potong}</td>
             <td style="padding:15px; text-align:center;">
-                <button class="del-res-btn" data-id="${r.id}" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                <button class="del-res-btn" data-id="${r.id}" data-pkg="${r.nama_paket}" data-item="${r.nama_barang_stok}" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`
         )
         .join("");
-      renderAestheticPagination("resPagination", resPages, st.resep);
 
+      renderAestheticPagination("resPagination", resPages, st.resep);
       attachTableEvents();
     };
 
     const attachTableEvents = () => {
       document.querySelectorAll(".toggle-pkg-btn").forEach((btn) => {
         btn.onclick = async () => {
-          await supabase
+          const newStatus = btn.dataset.status !== "true";
+          const { error } = await supabase
             .from("master_paket")
-            .update({ is_active: btn.dataset.status !== "true" })
+            .update({ is_active: newStatus })
             .eq("nama_paket", btn.dataset.name);
-          loadDataOnly();
-          refreshDropdowns();
+          if (!error) {
+            window.createAuditLog(
+              "UPDATE",
+              "master_paket",
+              `${newStatus ? "Mengaktifkan" : "Mengarsipkan"} paket ${
+                btn.dataset.name
+              }`
+            );
+            loadDataOnly();
+            refreshDropdowns();
+          }
         };
       });
       document.querySelectorAll(".del-res-btn").forEach((btn) => {
@@ -315,11 +298,18 @@ export const BundlePage = {
             color: "#fff",
           });
           if (isConfirmed) {
-            await supabase
+            const { error } = await supabase
               .from("bundle_items")
               .delete()
               .eq("id", btn.dataset.id);
-            loadDataOnly();
+            if (!error) {
+              window.createAuditLog(
+                "DELETE",
+                "bundle_items",
+                `Menghapus ${btn.dataset.item} dari resep paket ${btn.dataset.pkg}`
+              );
+              loadDataOnly();
+            }
           }
         };
       });
@@ -333,7 +323,6 @@ export const BundlePage = {
         loadDataOnly();
       }, 300);
     };
-
     els.resSearch.oninput = (e) => {
       clearTimeout(st.searchTimeout);
       st.searchTimeout = setTimeout(() => {
@@ -349,35 +338,49 @@ export const BundlePage = {
       if (!name || !price)
         return Swal.fire("Error", "Lengkapi Nama & Harga", "error");
 
-      await supabase.from("master_paket").upsert({
+      const { error } = await supabase.from("master_paket").upsert({
         nama_paket: name,
         total_harga: price,
         deskripsi_isi: document.getElementById("pkgDesc").value,
         is_active: true,
       });
-      Swal.fire({
-        title: "Berhasil",
-        icon: "success",
-        timer: 1000,
-        showConfirmButton: false,
-      });
-      loadDataOnly();
-      refreshDropdowns();
+      if (!error) {
+        window.createAuditLog(
+          "CREATE",
+          "master_paket",
+          `Upsert paket: ${name} seharga $${price}`
+        );
+        Swal.fire({
+          title: "Berhasil",
+          icon: "success",
+          timer: 1000,
+          showConfirmButton: false,
+        });
+        loadDataOnly();
+        refreshDropdowns();
+      }
     };
 
     document.getElementById("btnAddRes").onclick = async () => {
       const qty = parseInt(document.getElementById("resQty").value);
+      const pkg = els.resPkg.value;
+      const item = els.resItem.value;
       if (!qty || qty <= 0)
         return Swal.fire("Error", "Qty tidak valid", "warning");
 
-      await supabase.from("bundle_items").insert([
-        {
-          nama_paket: els.resPkg.value,
-          nama_barang_stok: els.resItem.value,
-          jumlah_potong: qty,
-        },
-      ]);
-      loadDataOnly();
+      const { error } = await supabase
+        .from("bundle_items")
+        .insert([
+          { nama_paket: pkg, nama_barang_stok: item, jumlah_potong: qty },
+        ]);
+      if (!error) {
+        window.createAuditLog(
+          "CREATE",
+          "bundle_items",
+          `Menambah resep: ${pkg} butuh ${qty}x ${item}`
+        );
+        loadDataOnly();
+      }
     };
 
     await refreshDropdowns();

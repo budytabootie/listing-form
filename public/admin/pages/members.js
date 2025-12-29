@@ -76,7 +76,7 @@ export const MembersPage = {
     <div id="memberPagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 25px; align-items: center;"></div>
   `,
 
-  init: async (supabase) => {
+  init: async (supabase, userData) => {
     const st = MembersPage.state;
 
     const loadMembers = async () => {
@@ -158,7 +158,9 @@ export const MembersPage = {
             m.nama
           }" data-rank="${m.rank}" data-discord="${m.discord_id || ""}" 
                     style="background:#5865F2; padding:8px 12px; margin-right:5px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-user-edit"></i></button>
-                <button class="btn-delete" data-id="${m.id}" 
+                <button class="btn-delete" data-id="${m.id}" data-nama="${
+            m.nama
+          }"
                     style="background:#ed4245; padding:8px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-user-minus"></i></button>
             </td>
         </tr>`
@@ -202,25 +204,39 @@ export const MembersPage = {
               discord_id: document.getElementById("swal-discord").value,
             }),
           });
+
           if (formValues) {
-            await supabase.from("members").update(formValues).eq("id", id);
-            Swal.fire({
-              icon: "success",
-              title: "Updated!",
-              text: "Profil member berhasil diperbarui",
-              timer: 1500,
-              showConfirmButton: false,
-            });
-            loadMembers();
+            const { error } = await supabase
+              .from("members")
+              .update(formValues)
+              .eq("id", id);
+            if (!error) {
+              // AUDIT LOG: Update Member
+              window.createAuditLog(
+                "UPDATE",
+                "members",
+                `Mengubah profil member: ${nama} -> ${formValues.nama} (${formValues.rank})`
+              );
+
+              Swal.fire({
+                icon: "success",
+                title: "Updated!",
+                text: "Profil member berhasil diperbarui",
+                timer: 1500,
+                showConfirmButton: false,
+              });
+              loadMembers();
+            }
           }
         };
       });
 
       tableBody.querySelectorAll(".btn-delete").forEach((btn) => {
         btn.onclick = async () => {
+          const { id, nama } = btn.dataset;
           const { isConfirmed } = await Swal.fire({
             title: "Hapus Member?",
-            text: "Aksi ini akan menghapus member dari daftar organisasi.",
+            text: `Aksi ini akan menghapus ${nama} dari daftar organisasi.`,
             icon: "warning",
             showCancelButton: true,
             confirmButtonColor: "#ed4245",
@@ -229,8 +245,19 @@ export const MembersPage = {
             color: "#fff",
           });
           if (isConfirmed) {
-            await supabase.from("members").delete().eq("id", btn.dataset.id);
-            loadMembers();
+            const { error } = await supabase
+              .from("members")
+              .delete()
+              .eq("id", id);
+            if (!error) {
+              // AUDIT LOG: Delete Member
+              window.createAuditLog(
+                "DELETE",
+                "members",
+                `Menghapus member: ${nama}`
+              );
+              loadMembers();
+            }
           }
         };
       });
@@ -308,6 +335,13 @@ export const MembersPage = {
           .from("members")
           .insert([{ nama, rank, discord_id }]);
         if (!error) {
+          // AUDIT LOG: Create Member
+          window.createAuditLog(
+            "CREATE",
+            "members",
+            `Menambahkan member baru: ${nama} (${rank})`
+          );
+
           Swal.fire({
             icon: "success",
             title: "Berhasil!",

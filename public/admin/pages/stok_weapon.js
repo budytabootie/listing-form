@@ -62,7 +62,8 @@ export const StokWeaponPage = {
         <div id="weaponPagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 25px; align-items: center;"></div>
     `,
 
-  init: async (supabase) => {
+  // MODIFIKASI: Menambahkan parameter userData
+  init: async (supabase, userData) => {
     const st = StokWeaponPage.state;
     const tableBody = document.getElementById("weaponTableBody");
     const paginContainer = document.getElementById("weaponPagination");
@@ -101,8 +102,6 @@ export const StokWeaponPage = {
     const refreshUI = () => {
       let filtered = st.allData.filter((item) => {
         const query = st.searchQuery.toLowerCase();
-
-        // LOGIKA SEARCH BARU: Cek Senjata, SN, dan Holder
         const matchesSearch =
           item.weapon_name.toLowerCase().includes(query) ||
           item.serial_number.toLowerCase().includes(query) ||
@@ -122,7 +121,6 @@ export const StokWeaponPage = {
         return matchesSearch && matchesFilter;
       });
 
-      // Sorting
       filtered.sort((a, b) => {
         let valA = (a[st.sortField] || "").toString().toLowerCase();
         let valB = (b[st.sortField] || "").toString().toLowerCase();
@@ -213,19 +211,13 @@ export const StokWeaponPage = {
         return;
       }
       const curr = st.currentPage;
-
       const btnBase = `border:none; color:#dcddde; padding:8px 14px; margin:0 3px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600; background:#4f545c; transition:all 0.2s ease; display:flex; align-items:center; justify-content:center;`;
-
       let html = `<div style="display:flex; align-items:center; background:#23272a; padding:6px; border-radius:12px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2);">`;
-
-      // Prev
       html += `<button class="pg-weap" data-page="${curr - 1}" ${
         curr === 1 ? "disabled" : ""
       } style="${btnBase} ${
         curr === 1 ? "opacity:0.3; cursor:not-allowed;" : ""
       }"><i class="fas fa-chevron-left"></i></button>`;
-
-      // Numbers
       for (let i = 1; i <= totalPages; i++) {
         if (i === 1 || i === totalPages || (i >= curr - 1 && i <= curr + 1)) {
           const isActive = i === curr;
@@ -238,29 +230,12 @@ export const StokWeaponPage = {
           html += `<span style="color:#4f545c; padding:0 5px;">...</span>`;
         }
       }
-
-      // Next
       html += `<button class="pg-weap" data-page="${curr + 1}" ${
         curr === totalPages ? "disabled" : ""
       } style="${btnBase} ${
         curr === totalPages ? "opacity:0.3; cursor:not-allowed;" : ""
       }"><i class="fas fa-chevron-right"></i></button>`;
-
       paginContainer.innerHTML = html + `</div>`;
-
-      // Hover Effect
-      paginContainer
-        .querySelectorAll(".pg-weap:not([disabled])")
-        .forEach((btn) => {
-          btn.onmouseover = () => {
-            if (!btn.style.background.includes("88,101,242"))
-              btn.style.background = "#6d7178";
-          };
-          btn.onmouseout = () => {
-            if (!btn.style.background.includes("88,101,242"))
-              btn.style.background = "#4f545c";
-          };
-        });
     };
 
     paginContainer.onclick = (e) => {
@@ -274,6 +249,7 @@ export const StokWeaponPage = {
     tableBody.onclick = async (e) => {
       const editBtn = e.target.closest(".btn-edit-weap");
       const delBtn = e.target.closest(".btn-del-weap");
+
       if (editBtn) {
         const item = st.allData.find((i) => i.id == editBtn.dataset.id);
         const { value: res } = await Swal.fire({
@@ -313,33 +289,55 @@ export const StokWeaponPage = {
             status: document.getElementById("sw-s").value,
           }),
         });
+
         if (res) {
-          await supabase
+          const { error } = await supabase
             .from("inventory_weapons")
             .update(res)
             .eq("id", item.id);
-          loadWeapons();
+          if (!error) {
+            // AUDIT LOG: Update
+            window.createAuditLog(
+              "UPDATE",
+              "inventory_weapons",
+              `Update unit ${item.weapon_name} [${
+                item.serial_number
+              }] -> Status: ${res.status}, Holder: ${res.hold_by || "Gudang"}`
+            );
+            loadWeapons();
+          }
         }
       }
-      if (
-        delBtn &&
-        (
-          await Swal.fire({
-            title: "Hapus Unit?",
-            text: "Data SN akan dihapus permanen.",
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonColor: "#ed4245",
-            background: "#2f3136",
-            color: "#fff",
-          })
-        ).isConfirmed
-      ) {
-        await supabase
-          .from("inventory_weapons")
-          .delete()
-          .eq("id", delBtn.dataset.id);
-        loadWeapons();
+
+      if (delBtn) {
+        const item = st.allData.find((i) => i.id == delBtn.dataset.id);
+        if (
+          (
+            await Swal.fire({
+              title: "Hapus Unit?",
+              text: `Senjata ${item.weapon_name} [${item.serial_number}] akan dihapus permanen.`,
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonColor: "#ed4245",
+              background: "#2f3136",
+              color: "#fff",
+            })
+          ).isConfirmed
+        ) {
+          const { error } = await supabase
+            .from("inventory_weapons")
+            .delete()
+            .eq("id", delBtn.dataset.id);
+          if (!error) {
+            // AUDIT LOG: Delete
+            window.createAuditLog(
+              "DELETE",
+              "inventory_weapons",
+              `Menghapus unit ${item.weapon_name} dengan SN: ${item.serial_number}`
+            );
+            loadWeapons();
+          }
+        }
       }
     };
 
@@ -348,11 +346,20 @@ export const StokWeaponPage = {
         s = document.getElementById("weapSN").value.trim().toUpperCase();
       if (!s || st.allData.some((w) => w.serial_number === s))
         return Swal.fire("Error", "SN Kosong atau Duplikat", "error");
-      await supabase
+
+      const { error } = await supabase
         .from("inventory_weapons")
         .insert([{ weapon_name: n, serial_number: s, status: "available" }]);
-      document.getElementById("weapSN").value = "";
-      loadWeapons();
+      if (!error) {
+        // AUDIT LOG: Create
+        window.createAuditLog(
+          "CREATE",
+          "inventory_weapons",
+          `Registrasi unit baru: ${n} [SN: ${s}]`
+        );
+        document.getElementById("weapSN").value = "";
+        loadWeapons();
+      }
     };
 
     document.getElementById("weapSearch").oninput = (e) => {
