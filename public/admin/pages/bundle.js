@@ -3,6 +3,7 @@ export const BundlePage = {
   state: {
     paket: { searchQuery: "", currentPage: 1, itemsPerPage: 5 },
     resep: { searchQuery: "", currentPage: 1, itemsPerPage: 5 },
+    searchTimeout: null,
   },
 
   render: () => `
@@ -59,9 +60,18 @@ export const BundlePage = {
             <i class="fas fa-scroll" style="color:#43b581;"></i> Isi Item (Resep Potong Stok)
         </h4>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end; margin-bottom:30px;">
-            <select id="resPkg" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px;"></select>
-            <select id="resItem" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px;"></select>
-            <input type="number" id="resQty" placeholder="Qty" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px;">
+            <div>
+                <label style="font-size:0.75rem; color:#b9bbbe; text-transform:uppercase; font-weight:bold;">Pilih Paket</label>
+                <select id="resPkg" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px; width:100%;"></select>
+            </div>
+            <div>
+                <label style="font-size:0.75rem; color:#b9bbbe; text-transform:uppercase; font-weight:bold;">Pilih Barang</label>
+                <select id="resItem" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px; width:100%;"></select>
+            </div>
+            <div>
+                <label style="font-size:0.75rem; color:#b9bbbe; text-transform:uppercase; font-weight:bold;">Qty</label>
+                <input type="number" id="resQty" value="1" style="background:#202225; border:1px solid #4f545c; color:white; padding:8px; border-radius:4px; width:100%;">
+            </div>
             <button id="btnAddRes" style="background:#43b581; padding: 10px 25px; font-weight:bold; height:40px; border:none; color:white; border-radius:4px; cursor:pointer;">TAMBAH</button>
         </div>
 
@@ -89,11 +99,19 @@ export const BundlePage = {
 
   init: async (supabase) => {
     const st = BundlePage.state;
+    const els = {
+      pkgBody: document.getElementById("pkgListTableBody"),
+      resBody: document.getElementById("resTableBody"),
+      resPkg: document.getElementById("resPkg"),
+      resItem: document.getElementById("resItem"),
+      pkgSearch: document.getElementById("pkgSearch"),
+      resSearch: document.getElementById("resSearch"),
+    };
 
-    const renderAestheticPagination = (id, totalPages, stateObj, callback) => {
+    // FUNGSI PAGINATION AESTHETIC (KEMBALI KE VERSI LENGKAP)
+    const renderAestheticPagination = (id, totalPages, stateObj) => {
       const container = document.getElementById(id);
-      if (!container) return;
-      if (totalPages <= 1) {
+      if (!container || totalPages <= 1) {
         container.innerHTML = "";
         return;
       }
@@ -107,17 +125,23 @@ export const BundlePage = {
       if (end - start < 2) start = Math.max(1, end - 2);
 
       let html = `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px; border:1px solid #36393f;">`;
+
+      // Tombol First & Prev
       html += `
         <button class="pg-btn" data-page="1" ${
           currentPage === 1
             ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
             : 'style="' + baseStyle + navStyle + '"'
-        }><i class="fas fa-angles-left"></i></button>
+        }>
+          <i class="fas fa-angles-left"></i>
+        </button>
         <button class="pg-btn" data-page="${currentPage - 1}" ${
         currentPage === 1
           ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
           : 'style="' + baseStyle + navStyle + '"'
-      }><i class="fas fa-chevron-left"></i></button>
+      }>
+          <i class="fas fa-chevron-left"></i>
+        </button>
       `;
 
       for (let i = start; i <= end; i++) {
@@ -128,57 +152,80 @@ export const BundlePage = {
           isActive
             ? "box-shadow: 0 4px 12px rgba(88,101,242,0.4); border:1px solid white;"
             : ""
-        }">${i}</button>`;
+        }">
+          ${i}
+        </button>`;
       }
 
+      // Tombol Next & Last
       html += `
         <button class="pg-btn" data-page="${currentPage + 1}" ${
         currentPage === totalPages
           ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
           : 'style="' + baseStyle + navStyle + '"'
-      }><i class="fas fa-chevron-right"></i></button>
+      }>
+          <i class="fas fa-chevron-right"></i>
+        </button>
         <button class="pg-btn" data-page="${totalPages}" ${
         currentPage === totalPages
           ? 'disabled style="' + baseStyle + navStyle + 'opacity:0.2"'
           : 'style="' + baseStyle + navStyle + '"'
-      }><i class="fas fa-angles-right"></i></button>
+      }>
+          <i class="fas fa-angles-right"></i>
+        </button>
       </div>`;
 
       container.innerHTML = html;
       container.querySelectorAll(".pg-btn").forEach((btn) => {
         btn.onclick = () => {
+          if (btn.disabled) return;
           stateObj.currentPage = parseInt(btn.dataset.page);
-          loadAll();
-          container.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          loadDataOnly();
         };
       });
     };
 
-    const loadAll = async () => {
-      const pkgBody = document.getElementById("pkgListTableBody");
-      const resBody = document.getElementById("resTableBody");
-      if (!pkgBody || !resBody) return;
+    const refreshDropdowns = async () => {
+      const { data: pkgs } = await supabase
+        .from("master_paket")
+        .select("nama_paket")
+        .eq("is_active", true)
+        .order("nama_paket");
+      const { data: items } = await supabase
+        .from("katalog_barang")
+        .select("nama_barang")
+        .order("nama_barang");
+      if (els.resPkg)
+        els.resPkg.innerHTML = (pkgs || [])
+          .map(
+            (p) => `<option value="${p.nama_paket}">${p.nama_paket}</option>`
+          )
+          .join("");
+      if (els.resItem)
+        els.resItem.innerHTML = (items || [])
+          .map(
+            (i) => `<option value="${i.nama_barang}">${i.nama_barang}</option>`
+          )
+          .join("");
+    };
 
+    const loadDataOnly = async () => {
       const { data: pkgs } = await supabase
         .from("master_paket")
         .select("*")
         .order("nama_paket");
-      const { data: items } = await supabase
-        .from("katalog_barang")
-        .select("nama_barang");
       const { data: recipes } = await supabase.from("bundle_items").select("*");
 
-      const filteredPkgs = (pkgs || []).filter((p) =>
+      // Render Paket Table
+      const fPkgs = (pkgs || []).filter((p) =>
         p.nama_paket.toLowerCase().includes(st.paket.searchQuery.toLowerCase())
       );
-      const pkgTotalPages =
-        Math.ceil(filteredPkgs.length / st.paket.itemsPerPage) || 1;
-      const paginatedPkgs = filteredPkgs.slice(
-        (st.paket.currentPage - 1) * st.paket.itemsPerPage,
-        st.paket.currentPage * st.paket.itemsPerPage
-      );
-
-      pkgBody.innerHTML = paginatedPkgs
+      const pkgPages = Math.ceil(fPkgs.length / st.paket.itemsPerPage) || 1;
+      els.pkgBody.innerHTML = fPkgs
+        .slice(
+          (st.paket.currentPage - 1) * st.paket.itemsPerPage,
+          st.paket.currentPage * st.paket.itemsPerPage
+        )
         .map(
           (p) => `
         <tr style="border-bottom: 1px solid #36393f;">
@@ -191,11 +238,15 @@ export const BundlePage = {
             <td style="padding:15px; color:#b9bbbe;">${
               p.deskripsi_isi || "-"
             }</td>
-            <td style="padding:15px;"><span class="badge ${
-              p.is_active ? "user" : "admin"
-            }">${p.is_active ? "Aktif" : "Arsip"}</span></td>
+            <td style="padding:15px;"><span style="background:${
+              p.is_active ? "#43b58122" : "#ed424522"
+            }; color:${
+            p.is_active ? "#43b581" : "#ed4245"
+          }; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${
+            p.is_active ? "AKTIF" : "ARSIP"
+          }</span></td>
             <td style="padding:15px; text-align:center;">
-                <button class="btn-toggle-pkg" data-name="${
+                <button class="toggle-pkg-btn" data-name="${
                   p.nama_paket
                 }" data-status="${p.is_active}" style="background:${
             p.is_active ? "#faa61a" : "#43b581"
@@ -206,14 +257,10 @@ export const BundlePage = {
         </tr>`
         )
         .join("");
-      renderAestheticPagination(
-        "pkgPagination",
-        pkgTotalPages,
-        st.paket,
-        loadAll
-      );
+      renderAestheticPagination("pkgPagination", pkgPages, st.paket);
 
-      const filteredRes = (recipes || []).filter(
+      // Render Resep Table
+      const fRes = (recipes || []).filter(
         (r) =>
           r.nama_paket
             .toLowerCase()
@@ -222,14 +269,12 @@ export const BundlePage = {
             .toLowerCase()
             .includes(st.resep.searchQuery.toLowerCase())
       );
-      const resTotalPages =
-        Math.ceil(filteredRes.length / st.resep.itemsPerPage) || 1;
-      const paginatedRes = filteredRes.slice(
-        (st.resep.currentPage - 1) * st.resep.itemsPerPage,
-        st.resep.currentPage * st.resep.itemsPerPage
-      );
-
-      resBody.innerHTML = paginatedRes
+      const resPages = Math.ceil(fRes.length / st.resep.itemsPerPage) || 1;
+      els.resBody.innerHTML = fRes
+        .slice(
+          (st.resep.currentPage - 1) * st.resep.itemsPerPage,
+          st.resep.currentPage * st.resep.itemsPerPage
+        )
         .map(
           (r) => `
         <tr style="border-bottom: 1px solid #36393f;">
@@ -237,72 +282,35 @@ export const BundlePage = {
             <td style="padding:15px; color:#b9bbbe;">${r.nama_barang_stok}</td>
             <td style="padding:15px; font-weight:bold; color:white;">${r.jumlah_potong}</td>
             <td style="padding:15px; text-align:center;">
-                <button class="btn-del-res" data-id="${r.id}" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                <button class="del-res-btn" data-id="${r.id}" style="background:#ed4245; padding:6px 12px; border:none; border-radius:4px; color:white; cursor:pointer;"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`
         )
         .join("");
-      renderAestheticPagination(
-        "resPagination",
-        resTotalPages,
-        st.resep,
-        loadAll
-      );
+      renderAestheticPagination("resPagination", resPages, st.resep);
 
-      const resPkgEl = document.getElementById("resPkg");
-      const resItemEl = document.getElementById("resItem");
-      if (resPkgEl)
-        resPkgEl.innerHTML = (pkgs || [])
-          .filter((p) => p.is_active)
-          .map(
-            (p) => `<option value="${p.nama_paket}">${p.nama_paket}</option>`
-          )
-          .join("");
-      if (resItemEl)
-        resItemEl.innerHTML = (items || [])
-          .map(
-            (i) => `<option value="${i.nama_barang}">${i.nama_barang}</option>`
-          )
-          .join("");
-
-      attachEvents(supabase, loadAll);
+      attachTableEvents();
     };
 
-    const attachEvents = (supabase, loadAll) => {
-      document.querySelectorAll(".btn-toggle-pkg").forEach((btn) => {
+    const attachTableEvents = () => {
+      document.querySelectorAll(".toggle-pkg-btn").forEach((btn) => {
         btn.onclick = async () => {
-          const action =
-            btn.dataset.status === "true" ? "Mengarsipkan" : "Mengaktifkan";
-          const { isConfirmed } = await Swal.fire({
-            title: "Konfirmasi",
-            text: `Yakin ingin ${action.toLowerCase()} paket ini?`,
-            icon: "question",
-            showCancelButton: true,
-            confirmButtonColor: "#5865F2",
-            cancelButtonColor: "#4f545c",
-            background: "#2f3136",
-            color: "#fff",
-          });
-
-          if (isConfirmed) {
-            await supabase
-              .from("master_paket")
-              .update({ is_active: btn.dataset.status !== "true" })
-              .eq("nama_paket", btn.dataset.name);
-            loadAll();
-          }
+          await supabase
+            .from("master_paket")
+            .update({ is_active: btn.dataset.status !== "true" })
+            .eq("nama_paket", btn.dataset.name);
+          loadDataOnly();
+          refreshDropdowns();
         };
       });
-
-      document.querySelectorAll(".btn-del-res").forEach((btn) => {
+      document.querySelectorAll(".del-res-btn").forEach((btn) => {
         btn.onclick = async () => {
           const { isConfirmed } = await Swal.fire({
-            title: "Hapus Resep?",
-            text: "Item ini akan dihapus dari daftar potong stok.",
+            title: "Hapus?",
+            text: "Hapus item ini dari resep?",
             icon: "warning",
             showCancelButton: true,
             confirmButtonColor: "#ed4245",
-            cancelButtonColor: "#4f545c",
             background: "#2f3136",
             color: "#fff",
           });
@@ -311,85 +319,68 @@ export const BundlePage = {
               .from("bundle_items")
               .delete()
               .eq("id", btn.dataset.id);
-            loadAll();
+            loadDataOnly();
           }
         };
       });
     };
 
-    document.getElementById("pkgSearch").oninput = (e) => {
-      st.paket.searchQuery = e.target.value;
-      st.paket.currentPage = 1;
-      loadAll();
+    els.pkgSearch.oninput = (e) => {
+      clearTimeout(st.searchTimeout);
+      st.searchTimeout = setTimeout(() => {
+        st.paket.searchQuery = e.target.value;
+        st.paket.currentPage = 1;
+        loadDataOnly();
+      }, 300);
     };
-    document.getElementById("resSearch").oninput = (e) => {
-      st.resep.searchQuery = e.target.value;
-      st.resep.currentPage = 1;
-      loadAll();
+
+    els.resSearch.oninput = (e) => {
+      clearTimeout(st.searchTimeout);
+      st.searchTimeout = setTimeout(() => {
+        st.resep.searchQuery = e.target.value;
+        st.resep.currentPage = 1;
+        loadDataOnly();
+      }, 300);
     };
 
     document.getElementById("btnSavePkg").onclick = async () => {
       const name = document.getElementById("pkgName").value.trim();
       const price = parseInt(document.getElementById("pkgPrice").value);
       if (!name || !price)
-        return Swal.fire("Error", "Lengkapi data nama dan harga!", "error");
+        return Swal.fire("Error", "Lengkapi Nama & Harga", "error");
 
-      const { isConfirmed } = await Swal.fire({
-        title: "Simpan Paket?",
-        text: "Pastikan data paket master sudah benar.",
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#5865F2",
-        background: "#2f3136",
-        color: "#fff",
+      await supabase.from("master_paket").upsert({
+        nama_paket: name,
+        total_harga: price,
+        deskripsi_isi: document.getElementById("pkgDesc").value,
+        is_active: true,
       });
-
-      if (isConfirmed) {
-        await supabase.from("master_paket").upsert({
-          nama_paket: name,
-          total_harga: price,
-          deskripsi_isi: document.getElementById("pkgDesc").value,
-          is_active: true,
-        });
-
-        Swal.fire({
-          title: "Berhasil",
-          text: "Paket disimpan",
-          icon: "success",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-        loadAll();
-      }
+      Swal.fire({
+        title: "Berhasil",
+        icon: "success",
+        timer: 1000,
+        showConfirmButton: false,
+      });
+      loadDataOnly();
+      refreshDropdowns();
     };
 
     document.getElementById("btnAddRes").onclick = async () => {
       const qty = parseInt(document.getElementById("resQty").value);
       if (!qty || qty <= 0)
-        return Swal.fire("Error", "Isi jumlah Qty yang valid!", "warning");
+        return Swal.fire("Error", "Qty tidak valid", "warning");
 
-      const { isConfirmed } = await Swal.fire({
-        title: "Tambah Resep?",
-        text: "Item akan otomatis memotong stok saat paket diproses.",
-        icon: "info",
-        showCancelButton: true,
-        confirmButtonColor: "#43b581",
-        background: "#2f3136",
-        color: "#fff",
-      });
-
-      if (isConfirmed) {
-        await supabase.from("bundle_items").insert([
-          {
-            nama_paket: document.getElementById("resPkg").value,
-            nama_barang_stok: document.getElementById("resItem").value,
-            jumlah_potong: qty,
-          },
-        ]);
-        loadAll();
-      }
+      await supabase.from("bundle_items").insert([
+        {
+          nama_paket: els.resPkg.value,
+          nama_barang_stok: els.resItem.value,
+          jumlah_potong: qty,
+        },
+      ]);
+      loadDataOnly();
     };
 
-    await loadAll();
+    await refreshDropdowns();
+    await loadDataOnly();
   },
 };
