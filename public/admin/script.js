@@ -34,7 +34,6 @@ window.createAuditLog = async (action, tableName, description) => {
 window.loadPage = async (page) => {
   const area = document.getElementById("content-area");
 
-  // Perbaikan: Pastikan data benar-benar ada sebelum lanjut
   if (!_supabase || !_userData) {
     console.warn("Koneksi belum siap, mencoba ulang...");
     setTimeout(() => window.loadPage(page), 200);
@@ -64,7 +63,6 @@ window.loadPage = async (page) => {
   if (pages[page]) {
     try {
       area.innerHTML = pages[page].render();
-      // Mengirim _userData dengan proteksi tambahan
       await pages[page].init(_supabase, _userData);
     } catch (err) {
       console.error(`Gagal memuat halaman ${page}:`, err);
@@ -109,22 +107,26 @@ async function init() {
       return;
     }
 
-    // Set _userData SEBELUM memanggil loadPage
     _userData = sessionData.users_login;
 
-    const roleName = _userData.roles?.role_name;
+    // --- PROTEKSI KERAS: JIKA ROLE_ID = 4 (MEMBER) TENDANG KE PORTAL ---
+    if (_userData.role_id === 4) {
+      window.location.href = "../index.html";
+      return;
+    }
 
     const nameDisplay = document.getElementById("userNameDisplay");
     if (nameDisplay) nameDisplay.innerText = _userData.nama_lengkap;
 
     const roleDisplay = document.getElementById("userRoleDisplay");
-    if (roleDisplay) roleDisplay.innerText = roleName;
+    if (roleDisplay)
+      roleDisplay.innerText = _userData.roles?.role_name || "Unknown";
 
-    filterMenuByRole(roleName);
+    filterMenuByRoleId(_userData.role_id);
     setupGlobalEvents();
 
-    // Default landing page berdasarkan role
-    if (roleName === "Super Admin" || roleName === "Treasurer") {
+    // Landing page default: Super Admin (1) & Treasurer (2) ke Dashboard, sisanya Katalog
+    if (_userData.role_id === 1 || _userData.role_id === 2) {
       window.loadPage("dashboard");
     } else {
       window.loadPage("katalog");
@@ -134,7 +136,7 @@ async function init() {
   }
 }
 
-function filterMenuByRole(role) {
+function filterMenuByRoleId(roleId) {
   const menuLogs = document.querySelector("[onclick=\"loadPage('logs')\"]");
   const menuUsers = document.querySelector("[onclick=\"loadPage('users')\"]");
   const menuDashboard = document.querySelector(
@@ -142,20 +144,33 @@ function filterMenuByRole(role) {
   );
   const menuOrders = document.querySelector("[onclick=\"loadPage('orders')\"]");
 
+  // Reset semua menu tampil dulu
   document
     .querySelectorAll(".menu-item")
     .forEach((el) => (el.style.display = "flex"));
 
-  if (role === "Staff") {
-    if (menuDashboard) menuDashboard.style.display = "none";
-    if (menuUsers) menuUsers.style.display = "none";
-    if (menuOrders) menuOrders.style.display = "none";
-    if (menuLogs) menuLogs.style.display = "none";
-  } else if (role === "Treasurer") {
-    if (menuUsers) menuUsers.style.display = "none";
-    if (menuLogs) menuLogs.style.display = "none";
-  } else if (role !== "Super Admin") {
-    if (menuLogs) menuLogs.style.display = "none";
+  switch (roleId) {
+    case 3: // Role: Staff
+      if (menuDashboard) menuDashboard.style.display = "none";
+      if (menuUsers) menuUsers.style.display = "none";
+      if (menuOrders) menuOrders.style.display = "none";
+      if (menuLogs) menuLogs.style.display = "none";
+      break;
+
+    case 2: // Role: Treasurer
+      if (menuUsers) menuUsers.style.display = "none";
+      if (menuLogs) menuLogs.style.display = "none";
+      break;
+
+    case 1: // Role: Super Admin
+      // Super Admin melihat semuanya, tidak perlu ada yang di-hidden
+      break;
+
+    default: // Jika role tidak dikenal atau Member (4)
+      document
+        .querySelectorAll(".menu-item")
+        .forEach((el) => (el.style.display = "none"));
+      break;
   }
 }
 

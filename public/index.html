@@ -15,7 +15,6 @@
 </head>
 
 <body class="portal-body">
-    <!-- TOP NAVBAR -->
     <nav class="portal-nav">
         <div class="portal-nav-left">
             <span class="portal-brand">
@@ -24,7 +23,6 @@
             </span>
         </div>
 
-        <!-- DESKTOP NAV CONTENT -->
         <div class="portal-nav-right">
             <div class="portal-nav-links">
                 <a href="#" class="portal-nav-link" id="nav-home" onclick="loadPage('home')">
@@ -32,6 +30,9 @@
                 </a>
                 <a href="#" class="portal-nav-link" id="nav-listing" onclick="loadPage('listing')">
                     <i class="fas fa-list-ul"></i> Listing
+                </a>
+                <a href="#" class="portal-nav-link" id="nav-history" onclick="loadPage('history')">
+                    <i class="fas fa-history"></i> History
                 </a>
                 <a href="#" class="portal-nav-link" id="nav-setoran" onclick="loadPage('setoran')">
                     <i class="fas fa-hand-holding-dollar"></i> Setoran
@@ -45,7 +46,7 @@
                 <span class="portal-user-status">● ONLINE</span>
             </div>
 
-            <div class="portal-nav-actions">
+            <div class="portal-nav-actions" id="portalNavActionsDesktop">
                 <button onclick="changePassword()" title="Ganti Password" class="portal-icon-btn">
                     <i class="fas fa-key"></i>
                 </button>
@@ -56,13 +57,11 @@
             </div>
         </div>
 
-        <!-- HAMBURGER: shown only on mobile via CSS -->
         <button class="portal-menu-toggle" id="portalMenuToggle">
             <i class="fas fa-bars"></i>
         </button>
     </nav>
 
-    <!-- MOBILE MENU: ALL NAV INFO MOVES IN HERE ON MOBILE -->
     <div class="portal-mobile-menu" id="portalMobileMenu">
         <div class="portal-mobile-section">
             <a href="#" class="portal-nav-link" onclick="loadPage('home')">
@@ -70,6 +69,9 @@
             </a>
             <a href="#" class="portal-nav-link" onclick="loadPage('listing')">
                 <i class="fas fa-list-ul"></i> Listing
+            </a>
+            <a href="#" class="portal-nav-link" onclick="loadPage('history')">
+                <i class="fas fa-history"></i> History
             </a>
             <a href="#" class="portal-nav-link" onclick="loadPage('setoran')">
                 <i class="fas fa-hand-holding-dollar"></i> Setoran
@@ -84,7 +86,7 @@
                 <span class="portal-user-status">● ONLINE</span>
             </div>
 
-            <div class="portal-nav-actions">
+            <div class="portal-nav-actions" id="portalNavActionsMobile">
                 <button onclick="changePassword()" title="Ganti Password" class="portal-icon-btn">
                     <i class="fas fa-key"></i>
                 </button>
@@ -96,7 +98,6 @@
         </div>
     </div>
 
-    <!-- CONTENT AREA (your SPA renders ListingPage, Home, etc. here) -->
     <div id="content-area" class="portal-content">
         <div class="portal-loading-block">
             <i class="fas fa-circle-notch fa-spin fa-3x"></i>
@@ -106,7 +107,6 @@
 
     <script type="module" src="script.js"></script>
 
-    <!-- JS for mobile menu toggle & syncing username -->
     <script>
         const mobileToggle = document.getElementById('portalMenuToggle');
         const mobileMenu = document.getElementById('portalMobileMenu');
@@ -116,7 +116,6 @@
                 mobileMenu.classList.toggle('open');
             });
 
-            // Close menu when a link is clicked
             mobileMenu.querySelectorAll('.portal-nav-link').forEach(link => {
                 link.addEventListener('click', () => {
                     mobileMenu.classList.remove('open');
@@ -124,16 +123,13 @@
             });
         }
 
-        // OPTIONAL: sync username to mobile header if you set it dynamically
-        function syncUserNameToMobile(name) {
+        // Fungsi Global untuk sinkronisasi nama dari script.js
+        window.syncUserUI = (name) => {
             const elDesktop = document.getElementById('userNameDisplay');
             const elMobile = document.getElementById('userNameDisplayMobile');
             if (elDesktop) elDesktop.textContent = name;
             if (elMobile) elMobile.textContent = name;
-        }
-
-        // Example: when you load user from session, call:
-        // syncUserNameToMobile(user.nama_lengkap || user.username);
+        };
     </script>
 </body>
 

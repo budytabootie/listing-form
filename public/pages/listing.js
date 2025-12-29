@@ -54,6 +54,8 @@ export const ListingPage = {
 
   init: async (supabase) => {
     const form = document.getElementById("myForm");
+    if (!form) return;
+
     const inputNama = document.getElementById("nama");
     const listContainer = document.getElementById("autocomplete-list");
     const rankSelect = document.getElementById("rank");
@@ -66,7 +68,6 @@ export const ListingPage = {
     const totalDisplay = document.getElementById("totalDisplay");
     const submitBtn = document.getElementById("submitBtn");
 
-    // Reset state pengiriman setiap kali masuk halaman
     ListingPage.state.isSubmitting = false;
 
     // --- LOAD DATA AWAL ---
@@ -159,8 +160,9 @@ export const ListingPage = {
     subSelect.onchange = async () => {
       const tipe = tipeSelect.value;
       const subTipe = subSelect.value;
+      if (!subTipe) return;
 
-      if (tipe === "Bundling" && subTipe) {
+      if (tipe === "Bundling") {
         const selected = ListingPage.state.dbBundles.find(
           (p) => p.nama_paket === subTipe
         );
@@ -171,7 +173,7 @@ export const ListingPage = {
           try {
             const { data: resep } = await supabase
               .from("bundle_items")
-              .select("nama_barang_stok, jumlah_potong")
+              .select("*")
               .eq("nama_paket", subTipe);
             const [resWep, resGen] = await Promise.all([
               supabase
@@ -215,7 +217,7 @@ export const ListingPage = {
             console.error(e);
           }
         }
-      } else if (tipe === "Non Bundling" && subTipe) {
+      } else if (tipe === "Non Bundling") {
         finalContainer.style.display = "block";
         checkList.innerHTML =
           "<p style='color:#72767d;'>Sinkronisasi gudang...</p>";
@@ -245,25 +247,24 @@ export const ListingPage = {
                     .length || 0
                 : resGen.data?.find((g) => g.item_name === item.nama_barang)
                     ?.stock || 0;
+
             if (actualStock > 0) {
               ListingPage.state.priceMap[item.nama_barang] =
                 item.harga_satuan || 0;
               checkList.innerHTML += `
-                                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                                    <div>
-                                        <label style="display:block;">${
-                                          item.nama_barang
-                                        }</label>
-                                        <small style="color:#43b581;">$${item.harga_satuan.toLocaleString()} (Stok: ${actualStock})</small>
-                                    </div>
-                                    <div class="qty-control">
-                                        <button type="button" class="qty-btn minus">−</button>
-                                        <input type="number" class="item-qty" data-name="${
-                                          item.nama_barang
-                                        }" value="0" min="0" max="${actualStock}" readonly style="width:50px; text-align:center; background:transparent; border:none; color:white;">
-                                        <button type="button" class="qty-btn plus">+</button>
-                                    </div>
-                                </div>`;
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                  <div>
+                    <label style="display:block;">${item.nama_barang}</label>
+                    <small style="color:#43b581;">$${item.harga_satuan.toLocaleString()} (Stok: ${actualStock})</small>
+                  </div>
+                  <div class="qty-control">
+                    <button type="button" class="qty-btn minus">−</button>
+                    <input type="number" class="item-qty" data-name="${
+                      item.nama_barang
+                    }" value="0" min="0" max="${actualStock}" readonly style="width:40px; text-align:center; background:transparent; border:none; color:white;">
+                    <button type="button" class="qty-btn plus">+</button>
+                  </div>
+                </div>`;
             }
           });
         } catch (e) {
@@ -273,7 +274,7 @@ export const ListingPage = {
       updateTotalPrice();
     };
 
-    // --- 4. QTY CONTROL (Event Delegation - ANTI DOUBLE) ---
+    // --- 4. QTY CONTROL ---
     form.onclick = (e) => {
       if (
         e.target.classList.contains("plus") ||
@@ -284,16 +285,14 @@ export const ListingPage = {
           .querySelector(".item-qty");
         let current = parseInt(input.value) || 0;
         const maxVal = parseInt(input.getAttribute("max") || 999);
-
         if (e.target.classList.contains("plus") && current < maxVal) current++;
         else if (e.target.classList.contains("minus") && current > 0) current--;
-
         input.value = current;
         updateTotalPrice();
       }
     };
 
-    // --- 5. SUBMIT LOGIC (With State Lock & Confirmation) ---
+    // --- 5. SUBMIT LOGIC ---
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (ListingPage.state.isSubmitting) return;
@@ -339,10 +338,9 @@ export const ListingPage = {
           "warning"
         );
 
-      // KONFIRMASI DAHULU
       const { isConfirmed } = await Swal.fire({
         title: "Kirim Laporan?",
-        text: `Total item: ${requests.length}. Pastikan data sudah benar.`,
+        text: `Konfirmasi pesanan untuk ${namaMember}.`,
         icon: "question",
         showCancelButton: true,
         confirmButtonColor: "#43b581",
@@ -363,6 +361,7 @@ export const ListingPage = {
           .insert(requests);
         if (dbError) throw dbError;
 
+        // Kirim ke Webhook Discord melalui API Proxy
         await fetch("/api/submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -378,15 +377,8 @@ export const ListingPage = {
           }),
         });
 
-        await Swal.fire(
-          "Berhasil!",
-          "Laporan telah masuk ke antrean Admin.",
-          "success"
-        );
-        form.reset();
-        subContainer.style.display = "none";
-        finalContainer.style.display = "none";
-        totalDisplay.innerText = "$0";
+        await Swal.fire("Berhasil!", "Laporan telah terkirim.", "success");
+        window.loadPage("home");
       } catch (err) {
         Swal.fire("Error", err.message, "error");
       } finally {
