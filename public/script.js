@@ -2,7 +2,10 @@ import { ListingPage } from "./pages/listing.js";
 import { HomePage } from "./pages/home.js";
 import { HistoryPage } from "./pages/history.js";
 import { WeaponPage } from "./pages/weapon.js";
-import { VestPage } from "./pages/vest.js"; // TAMBAHAN
+import { VestPage } from "./pages/vest.js";
+import { AmmoPage } from "./pages/ammo.js";
+import { AttachmentPage } from "./pages/attachment.js";
+import { BundlingPage } from "./pages/bundling.js"; // TAMBAHAN IMPORT
 import { CartPage } from "./pages/cart.js";
 import { GlobalCart } from "./pages/globalCart.js";
 
@@ -28,7 +31,6 @@ window.loadPage = (page) => {
       const nav = document.getElementById("nav-home");
       if (nav) nav.classList.add("active");
     } else if (page === "cart") {
-      // Mengambil data murni dari GlobalCart module
       const items = GlobalCart.getItems();
       area.innerHTML = CartPage.render(items);
       CartPage.init(_supabase, _currentUserData);
@@ -36,12 +38,19 @@ window.loadPage = (page) => {
       area.innerHTML = WeaponPage.render();
       WeaponPage.init(_supabase);
     } else if (page === "vest") {
-      // TAMBAHAN
       area.innerHTML = VestPage.render();
       VestPage.init(_supabase);
-    } else if (
-      ["ammo", "attachment", "narkoba", "drugs", "bundling"].includes(page)
-    ) {
+    } else if (page === "ammo") {
+      area.innerHTML = AmmoPage.render();
+      AmmoPage.init(_supabase);
+    } else if (page === "attachment") {
+      area.innerHTML = AttachmentPage.render();
+      AttachmentPage.init(_supabase);
+    } else if (page === "bundling") {
+      // AKTIFKAN BUNDLING
+      area.innerHTML = BundlingPage.render();
+      BundlingPage.init(_supabase);
+    } else if (["narkoba", "drugs"].includes(page)) {
       area.innerHTML = `
         <div style="text-align:center; padding:50px;">
             <h2 style="color:#faa61a;">Kategori ${page.toUpperCase()}</h2>
