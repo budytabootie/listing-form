@@ -1,45 +1,70 @@
 import { ListingPage } from "./pages/listing.js";
+import { HomePage } from "./pages/home.js";
 import { HistoryPage } from "./pages/history.js";
+import { WeaponPage } from "./pages/weapon.js";
+import { VestPage } from "./pages/vest.js"; // TAMBAHAN
+import { CartPage } from "./pages/cart.js";
+import { GlobalCart } from "./pages/globalCart.js";
 
 let _supabase;
 let _currentUserData;
 
-// Fungsi Navigasi Halaman User
+// Alias agar tombol onclick di HTML tetap jalan
+window.openCategory = (cat) => window.loadPage(cat);
+
+// Memastikan fungsi loadPage tersedia secara global
 window.loadPage = (page) => {
   const area = document.getElementById("content-area");
   if (!area) return;
 
-  // Reset class active di navbar (Desktop & Mobile)
   document
     .querySelectorAll(".portal-nav-link")
     .forEach((el) => el.classList.remove("active"));
 
-  if (page === "listing") {
-    area.innerHTML = ListingPage.render();
-    ListingPage.init(_supabase);
-    const nav = document.getElementById("nav-listing");
-    if (nav) nav.classList.add("active");
-  } else if (page === "history") {
-    area.innerHTML = HistoryPage.render();
-    HistoryPage.init(_supabase, _currentUserData);
-    const nav = document.getElementById("nav-history");
-    if (nav) nav.classList.add("active");
-  } else if (page === "home") {
-    area.innerHTML = `
-            <div style="text-align: center; margin-top: 50px;">
-                <h2 style="color: #5865F2;">Welcome back!</h2>
-                <p style="color: #b9bbbe;">Gunakan menu di atas untuk mulai bekerja.</p>
-            </div>`;
-    const nav = document.getElementById("nav-home");
-    if (nav) nav.classList.add("active");
-  } else if (page === "setoran") {
-    area.innerHTML = `
-            <div style="text-align: center; margin-top: 50px;">
-                <h2 style="color: #faa61a;">Fitur Setoran</h2>
-                <p style="color: #b9bbbe;">Fitur ini sedang dalam pengembangan.</p>
-            </div>`;
-    const nav = document.getElementById("nav-setoran");
-    if (nav) nav.classList.add("active");
+  try {
+    if (page === "home") {
+      area.innerHTML = HomePage.render(_currentUserData);
+      HomePage.init();
+      const nav = document.getElementById("nav-home");
+      if (nav) nav.classList.add("active");
+    } else if (page === "cart") {
+      // Mengambil data murni dari GlobalCart module
+      const items = GlobalCart.getItems();
+      area.innerHTML = CartPage.render(items);
+      CartPage.init(_supabase, _currentUserData);
+    } else if (page === "weapon") {
+      area.innerHTML = WeaponPage.render();
+      WeaponPage.init(_supabase);
+    } else if (page === "vest") {
+      // TAMBAHAN
+      area.innerHTML = VestPage.render();
+      VestPage.init(_supabase);
+    } else if (
+      ["ammo", "attachment", "narkoba", "drugs", "bundling"].includes(page)
+    ) {
+      area.innerHTML = `
+        <div style="text-align:center; padding:50px;">
+            <h2 style="color:#faa61a;">Kategori ${page.toUpperCase()}</h2>
+            <p style="color:#b9bbbe;">Sedang dalam sinkronisasi database...</p>
+            <button onclick="loadPage('home')" style="background:#5865F2; color:#fff; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; margin-top:20px;">Kembali</button>
+        </div>`;
+    } else if (page === "listing") {
+      area.innerHTML = ListingPage.render();
+      ListingPage.init(_supabase);
+      const nav = document.getElementById("nav-listing");
+      if (nav) nav.classList.add("active");
+    } else if (page === "history") {
+      area.innerHTML = HistoryPage.render();
+      HistoryPage.init(_supabase, _currentUserData);
+      const nav = document.getElementById("nav-history");
+      if (nav) nav.classList.add("active");
+    } else if (page === "setoran") {
+      area.innerHTML = `<div style="text-align: center; margin-top: 50px;"><h2 style="color: #faa61a;">Fitur Setoran</h2><p style="color: #b9bbbe;">Dalam pengembangan.</p></div>`;
+      const nav = document.getElementById("nav-setoran");
+      if (nav) nav.classList.add("active");
+    }
+  } catch (err) {
+    console.error("Gagal memuat halaman:", err);
   }
 };
 
@@ -57,10 +82,12 @@ async function init() {
 
     const { data: sessionData, error } = await _supabase
       .from("user_sessions")
-      .select("*, users_login(*)")
+      .select(
+        `token, users_login!user_id (id, username, nama_lengkap, role_id)`
+      )
       .eq("token", token)
       .gt("expires_at", new Date().toISOString())
-      .single();
+      .maybeSingle();
 
     if (error || !sessionData || !sessionData.users_login) {
       localStorage.removeItem("sessionToken");
@@ -68,21 +95,14 @@ async function init() {
       return;
     }
 
-    const userData = sessionData.users_login;
-    _currentUserData = userData;
+    _currentUserData = sessionData.users_login;
 
-    // SINKRONISASI UI NAMA (Desktop & Mobile)
-    if (window.syncUserUI) {
-      window.syncUserUI(userData.nama_lengkap);
-    } else {
-      const desktopName = document.getElementById("userNameDisplay");
-      const mobileName = document.getElementById("userNameDisplayMobile");
-      if (desktopName) desktopName.innerText = userData.nama_lengkap;
-      if (mobileName) mobileName.innerText = userData.nama_lengkap;
-    }
+    const elDesktop = document.getElementById("userNameDisplay");
+    const elMobile = document.getElementById("userNameDisplayMobile");
+    if (elDesktop) elDesktop.innerText = _currentUserData.nama_lengkap;
+    if (elMobile) elMobile.innerText = _currentUserData.nama_lengkap;
 
-    // --- FITUR TOMBOL KE ADMIN (UNTUK ROLE 1, 2, 3) ---
-    if (userData.role_id !== 4) {
+    if (_currentUserData.role_id !== 4) {
       document.querySelectorAll(".portal-nav-actions").forEach((container) => {
         if (!container.querySelector(".btn-go-admin")) {
           const btnAdmin = document.createElement("button");
@@ -96,44 +116,16 @@ async function init() {
       });
     }
 
-    // Setup Logout
     window.logout = async () => {
-      if (token && _supabase) {
+      if (token && _supabase)
         await _supabase.from("user_sessions").delete().eq("token", token);
-      }
       localStorage.removeItem("sessionToken");
       window.location.href = "login.html";
     };
 
-    // Setup Ganti Password
-    window.changePassword = async () => {
-      const { value: newPass } = await Swal.fire({
-        title: "Ganti Password",
-        input: "password",
-        inputLabel: "Masukkan Password Baru",
-        showCancelButton: true,
-        background: "#2f3136",
-        color: "#fff",
-        confirmButtonColor: "#5865F2",
-      });
-
-      if (newPass && newPass.length >= 6) {
-        const { error } = await _supabase.rpc("update_user_password_secure", {
-          u_id: userData.id,
-          new_pass: newPass,
-        });
-        if (error) Swal.fire("Gagal", error.message, "error");
-        else Swal.fire("Sukses", "Password berhasil diupdate!", "success");
-      } else if (newPass) {
-        Swal.fire("Peringatan", "Password minimal 6 karakter", "warning");
-      }
-    };
-
-    // Load halaman default (Home)
     window.loadPage("home");
   } catch (err) {
     console.error("Gagal inisialisasi:", err);
-    window.location.href = "login.html";
   }
 }
 

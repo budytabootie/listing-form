@@ -3,43 +3,42 @@ export const OrdersPage = {
   state: {
     orders: [],
     inventory: [],
-    bundleDetails: {},
+    katalog: [],
     isProcessing: false,
   },
 
   render: () => `
         <div class="header-container">
-            <h2>Order Requests</h2>
-            <p style="color: #b9bbbe; margin-top: -10px; font-size: 0.9rem;">Kelola permintaan barang secara real-time dengan rincian bundling otomatis.</p>
+            <h2>Pending Orders</h2>
+            <p style="color: #b9bbbe; margin-top: -10px; font-size: 0.9rem;">Proses item secara satuan. Pesanan otomatis selesai jika semua item sudah diproses.</p>
         </div>
-        <div id="ordersList" style="display: grid; gap: 15px;"></div>
+        <div id="ordersList" style="display: grid; gap: 20px;"></div>
     `,
 
-  // MODIFIKASI: Tambahkan userData sebagai parameter kedua
   init: async (supabase, userData) => {
     const container = document.getElementById("ordersList");
 
     const loadOrders = async () => {
       const [
         { data: orders },
+        { data: allItems },
         { data: inv },
         { data: weaponStocks },
-        { data: bundles },
+        { data: katalog },
       ] = await Promise.all([
         supabase
           .from("orders")
           .select("*")
           .eq("status", "pending")
           .order("created_at", { ascending: false }),
+        supabase.from("order_items").select("*").eq("status", "pending"),
         supabase.from("inventory").select("item_name, stock"),
         supabase
           .from("inventory_weapons")
           .select("weapon_name")
           .eq("status", "available")
           .is("hold_by", null),
-        supabase
-          .from("bundle_items")
-          .select("nama_paket, nama_barang_stok, jumlah_potong"),
+        supabase.from("katalog_barang").select("nama_barang, jenis_barang"),
       ]);
 
       const weaponCountMap = (weaponStocks || []).reduce((acc, w) => {
@@ -47,14 +46,7 @@ export const OrdersPage = {
         return acc;
       }, {});
 
-      const bundleMap = (bundles || []).reduce((acc, b) => {
-        if (!acc[b.nama_paket]) acc[b.nama_paket] = [];
-        acc[b.nama_paket].push(`${b.nama_barang_stok} (x${b.jumlah_potong})`);
-        return acc;
-      }, {});
-
-      OrdersPage.state.orders = orders || [];
-      OrdersPage.state.bundleDetails = bundleMap;
+      OrdersPage.state.katalog = katalog || [];
       OrdersPage.state.inventory = [
         ...(inv || []),
         ...Object.entries(weaponCountMap).map(([name, count]) => ({
@@ -63,246 +55,267 @@ export const OrdersPage = {
         })),
       ];
 
+      OrdersPage.state.orders = (orders || [])
+        .map((order) => ({
+          ...order,
+          rincian: (allItems || []).filter(
+            (item) => item.order_id === order.id
+          ),
+        }))
+        .filter((order) => order.rincian.length > 0);
+
       renderOrders();
     };
 
     const renderOrders = () => {
       if (OrdersPage.state.orders.length === 0) {
-        container.innerHTML = `<div style="background:#2f3136; padding:40px; border-radius:12px; text-align:center; color:#72767d; border: 1px dashed #4f545c;">Antrean kosong.</div>`;
+        container.innerHTML = `<div style="background:#2f3136; padding:40px; border-radius:12px; text-align:center; color:#72767d; border: 1px dashed #4f545c;">Semua item pesanan telah diproses.</div>`;
         return;
       }
 
       container.innerHTML = OrdersPage.state.orders
         .map((order) => {
-          const currentStock =
-            OrdersPage.state.inventory.find(
-              (i) => i.item_name === order.item_name
-            )?.stock || 0;
-          const isStockLow = currentStock < order.quantity;
-          const timeDiff = Math.floor(
-            (new Date() - new Date(order.created_at)) / 60000
-          );
-          const timeLabel =
-            timeDiff < 1 ? "Baru saja" : `${timeDiff}m yang lalu`;
-          const typeColor =
-            order.item_type === "Weapon"
-              ? "#5865F2"
-              : order.item_type === "Bundling"
-              ? "#9b59b6"
-              : "#faa61a";
+          const itemsHtml = order.rincian
+            .map((item) => {
+              const stockExist =
+                OrdersPage.state.inventory.find(
+                  (i) => i.item_name === item.item_name
+                )?.stock || 0;
+              const isStockLow = stockExist < item.quantity;
 
-          const rincianPaket =
-            OrdersPage.state.bundleDetails[order.item_name]?.join(", ") ||
-            "Rincian tidak ditemukan";
+              const categoryColors = {
+                Weapon: "#e74c3c",
+                Ammo: "#f1c40f",
+                Vest: "#3498db",
+                Attachment: "#e67e22",
+              };
+
+              // SOLUSI NULL: Cek item_type di order_items,
+              // jika kosong cek item_type di tabel orders (induk),
+              // jika masih kosong gunakan 'Item'.
+              const safeType = item.item_type || order.item_type || "Item";
+              const typeColor = categoryColors[safeType] || "#72767d";
+
+              return `
+              <div style="background:#18191c; margin-top:10px; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; border-left: 4px solid ${typeColor};">
+                <div>
+                  <div style="font-size:0.65rem; color:${typeColor}; font-weight:bold; text-transform:uppercase; margin-bottom:4px;">
+                    ${safeType}
+                  </div>
+                  <div style="color:#fff; font-weight:bold;">${
+                    item.item_name
+                  } <span style="color:#43b581;">x${item.quantity}</span></div>
+                  <div style="font-size:0.75rem; color:${
+                    isStockLow ? "#f04747" : "#b9bbbe"
+                  }; font-weight:${isStockLow ? "bold" : "normal"};">
+                    ${
+                      isStockLow
+                        ? '<i class="fas fa-exclamation-triangle"></i> Stok: '
+                        : "Gudang: "
+                    } ${stockExist}
+                  </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                  <button class="btn-item-action" data-item-id="${
+                    item.id
+                  }" data-order-id="${order.id}" data-action="approved" 
+                    ${
+                      isStockLow
+                        ? 'disabled style="background:#4f545c; opacity:0.5;"'
+                        : 'style="background:#43b581; cursor:pointer;"'
+                    }>
+                    APPROVE
+                  </button>
+                  <button class="btn-item-action" data-item-id="${
+                    item.id
+                  }" data-order-id="${order.id}" data-action="rejected" 
+                    style="background:#ed4245; cursor:pointer;">
+                    REJECT
+                  </button>
+                </div>
+              </div>
+            `;
+            })
+            .join("");
 
           return `
-            <div class="order-card" style="background: #2f3136; border-radius: 12px; padding: 20px; border-left: 5px solid ${typeColor}; display: flex; justify-content: space-between; align-items: center; position: relative;">
-                <div style="position: absolute; top: 0; right: 0; background: ${
-                  timeDiff > 15 ? "#ed4245" : "#4f545c"
-                }; color: white; padding: 2px 10px; font-size: 0.65rem; border-bottom-left-radius: 8px; font-weight: bold;">
-                    <i class="far fa-clock"></i> ${timeLabel}
+            <div class="order-card-container" style="background: #2f3136; border-radius: 12px; padding: 20px; border: 1px solid #4f545c; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #4f545c; padding-bottom:12px; margin-bottom:5px;">
+                  <div>
+                    <h3 style="margin:0; color:#fff; font-size:1.1rem;">${
+                      order.requested_by
+                    }</h3>
+                    <span style="font-size:0.75rem; color:#faa61a; font-weight:bold;">RANK: ${
+                      order.rank || "MEMBER"
+                    }</span>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="color:#43b581; font-weight:bold; font-size:1rem;">${
+                      order.total_price || "$ 0"
+                    }</div>
+                    <div style="font-size:0.65rem; color:#72767d;">${new Date(
+                      order.created_at
+                    ).toLocaleString()}</div>
+                  </div>
                 </div>
-                <div style="flex:1;">
-                    <span style="font-size:0.6rem; background:${typeColor}22; padding:2px 8px; border-radius:4px; color:${typeColor}; font-weight:bold; border: 1px solid ${typeColor}44;">${order.item_type.toUpperCase()}</span>
-                    <div style="font-size: 1.15rem; font-weight: bold; color: #fff; margin-top:5px;">
-                        ${order.item_name} <span style="color:#43b581;">x${
-            order.quantity
-          }</span>
-                    </div>
-                    ${
-                      order.item_type === "Bundling"
-                        ? `<div style="margin-top:8px; padding:8px; background:#202225; border-radius:6px; border:1px solid #444; width:fit-content; max-width:90%;">
-                            <div style="font-size:0.65rem; color:#b9bbbe; font-weight:bold; margin-bottom:2px;">ISI PAKET:</div>
-                            <div style="font-size:0.75rem; color:#eee; line-height:1.4;">${rincianPaket}</div>
-                        </div>`
-                        : ""
-                    }
-                    <div style="font-size: 0.85rem; color: #b9bbbe; margin-top: 8px;">
-                        User: <strong style="color:#fff;">${
-                          order.requested_by
-                        }</strong>
-                        ${
-                          order.total_price
-                            ? `<span style="margin-left:10px; color:#faa61a;">| Total: Rp ${order.total_price.toLocaleString()}</span>`
-                            : ""
-                        }
-                    </div>
-                    <div style="margin-top: 10px; font-size: 0.75rem; display: flex; align-items: center; gap: 8px;">
-                        <span style="color: #b9bbbe;">Stok:</span>
-                        <span style="padding: 2px 8px; border-radius: 10px; font-weight: bold; background: ${
-                          isStockLow ? "#ed424522" : "#43b58122"
-                        }; color: ${isStockLow ? "#ed4245" : "#43b581"};">
-                            ${currentStock} unit
-                        </span>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-action btn-app" data-id="${
-                      order.id
-                    }" data-status="approved" 
-                        ${
-                          isStockLow
-                            ? 'disabled style="background:#4f545c; opacity:0.5; border:none; color:white; padding:10px 20px; border-radius:6px;"'
-                            : 'style="background:#43b581; border:none; color:white; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold;"'
-                        }>APPROVE</button>
-                    <button class="btn-action btn-rej" data-id="${
-                      order.id
-                    }" data-status="rejected" style="background:#ed4245; border:none; color:white; padding:10px 20px; border-radius:6px; cursor:pointer;">REJECT</button>
-                </div>
+                <div>${itemsHtml}</div>
             </div>`;
         })
         .join("");
     };
 
     container.onclick = async (e) => {
-      const btn = e.target.closest(".btn-action");
+      const btn = e.target.closest(".btn-item-action");
       if (!btn || OrdersPage.state.isProcessing) return;
 
-      const order = OrdersPage.state.orders.find((o) => o.id == btn.dataset.id);
-      const status = btn.dataset.status;
+      const { itemId, orderId, action } = btn.dataset;
+      const order = OrdersPage.state.orders.find((o) => o.id === orderId);
+      const item = order.rincian.find((i) => i.id === itemId);
 
-      const { isConfirmed } = await Swal.fire({
-        title: status === "approved" ? "Approve?" : "Reject?",
-        text: `${status === "approved" ? "Berikan" : "Tolak"} ${
-          order.item_name
-        } untuk ${order.requested_by}?`,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: status === "approved" ? "#43b581" : "#ed4245",
-        background: "#2f3136",
-        color: "#fff",
-      });
-
-      if (isConfirmed) processOrder(order, status);
-    };
-
-    const processOrder = async (order, status) => {
-      OrdersPage.state.isProcessing = true;
-      let orderNotes = "";
+      if (action === "rejected") {
+        const confirm = await Swal.fire({
+          title: "Reject Item?",
+          text: `Tolak ${item.item_name} untuk ${order.requested_by}?`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#ed4245",
+          background: "#2f3136",
+          color: "#fff",
+        });
+        if (confirm.isConfirmed) await processItem(order, item, "rejected");
+        return;
+      }
 
       try {
-        if (status === "approved") {
-          if (order.item_type === "Weapon") {
-            const { data: units } = await supabase
-              .from("inventory_weapons")
-              .select("id, serial_number")
-              .eq("weapon_name", order.item_name)
-              .eq("status", "available")
-              .is("hold_by", null);
+        let snNotes = "";
+        const katalogItem = OrdersPage.state.katalog.find(
+          (k) => k.nama_barang === item.item_name
+        );
 
-            const { value: selectedId } = await Swal.fire({
-              title: "Pilih Serial Number",
-              background: "#2f3136",
-              color: "#fff",
-              html: `<div id="snGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 250px; overflow-y: auto;">
-                ${units
-                  .map(
-                    (u) =>
-                      `<button class="sn-choice" data-id="${u.id}" style="background:#202225; border:1px solid #4f545c; color:#43b581; padding:10px; border-radius:8px; cursor:pointer;">${u.serial_number}</button>`
-                  )
-                  .join("")}
-              </div>`,
-              preConfirm: () =>
-                document.querySelector(".sn-choice.selected")?.dataset.id,
-              didOpen: () => {
-                document.getElementById("snGrid").onclick = (e) => {
-                  const b = e.target.closest(".sn-choice");
-                  if (b) {
-                    document
-                      .querySelectorAll(".sn-choice")
-                      .forEach((x) => x.classList.remove("selected", "active"));
-                    b.classList.add("selected");
-                    b.style.borderColor = "#43b581";
-                    Swal.clickConfirm();
-                  }
-                };
-              },
-            });
+        if (katalogItem?.jenis_barang === "Weapon") {
+          const { data: units } = await supabase
+            .from("inventory_weapons")
+            .select("id, serial_number")
+            .eq("weapon_name", item.item_name)
+            .eq("status", "available")
+            .is("hold_by", null);
 
-            if (!selectedId) throw new Error("Dibatalkan");
-            const selUnit = units.find((u) => u.id == selectedId);
-            orderNotes = `SN: ${selUnit.serial_number}`;
-            await supabase
-              .from("inventory_weapons")
-              .update({ status: "in_use", hold_by: order.requested_by })
-              .eq("id", selectedId);
-          } else if (order.item_type === "Bundling") {
-            const { data: recipe } = await supabase
-              .from("bundle_items")
-              .select("nama_barang_stok, jumlah_potong")
-              .eq("nama_paket", order.item_name);
+          if (!units || units.length < item.quantity)
+            throw new Error("Stok SN tidak mencukupi!");
 
-            // --- MODIFIKASI DIMULAI DISINI ---
-            let bundlingNotes = "Isi Paket: ";
-            recipe.forEach((r, index) => {
-              bundlingNotes += `${r.nama_barang_stok} (x${r.jumlah_potong})${
-                index === recipe.length - 1 ? "" : ", "
-              }`;
-            });
-            orderNotes = bundlingNotes; // Simpan rincian ke orderNotes
-            // --- MODIFIKASI SELESAI ---
+          const { value: selectedSns } = await Swal.fire({
+            title: `Pilih ${item.quantity} SN - ${item.item_name}`,
+            background: "#2f3136",
+            color: "#fff",
+            html: `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">${units
+              .map(
+                (u) =>
+                  `<button class="sn-choice" data-id="${u.id}" data-sn="${u.serial_number}" style="background:#202225; border:1px solid #4f545c; color:#eee; padding:8px; border-radius:6px; cursor:pointer;">${u.serial_number}</button>`
+              )
+              .join("")}</div>`,
+            didOpen: () => {
+              const btns = document.querySelectorAll(".sn-choice");
+              let count = 0;
+              btns.forEach(
+                (b) =>
+                  (b.onclick = () => {
+                    if (b.classList.contains("selected")) {
+                      b.classList.remove("selected");
+                      b.style.background = "#202225";
+                      count--;
+                    } else if (count < item.quantity) {
+                      b.classList.add("selected");
+                      b.style.background = "#43b58144";
+                      count++;
+                    }
+                  })
+              );
+            },
+            preConfirm: () => {
+              const sel = document.querySelectorAll(".sn-choice.selected");
+              if (sel.length !== item.quantity) {
+                Swal.showValidationMessage(`Pilih tepat ${item.quantity} SN!`);
+                return false;
+              }
+              return Array.from(sel).map((el) => ({
+                id: el.dataset.id,
+                sn: el.dataset.sn,
+              }));
+            },
+          });
 
-            for (const item of recipe) {
-              const { data: inv } = await supabase
-                .from("inventory")
-                .select("id, stock")
-                .eq("item_name", item.nama_barang_stok)
-                .single();
-              await supabase
-                .from("inventory")
-                .update({
-                  stock: inv.stock - item.jumlah_potong * order.quantity,
-                })
-                .eq("id", inv.id);
-            }
-          } else {
-            const { data: inv } = await supabase
-              .from("inventory")
-              .select("id, stock")
-              .eq("item_name", order.item_name)
-              .single();
+          if (!selectedSns) return;
+          snNotes = selectedSns.map((s) => s.sn).join(", ");
+          await supabase
+            .from("inventory_weapons")
+            .update({ status: "in_use", hold_by: order.requested_by })
+            .in(
+              "id",
+              selectedSns.map((s) => s.id)
+            );
+        } else {
+          const { data: inv } = await supabase
+            .from("inventory")
+            .select("id, stock")
+            .eq("item_name", item.item_name)
+            .maybeSingle();
+          if (inv)
             await supabase
               .from("inventory")
-              .update({ stock: inv.stock - order.quantity })
+              .update({ stock: inv.stock - item.quantity })
               .eq("id", inv.id);
-          }
         }
 
-        // MODIFIKASI: Sertakan processed_by dan processed_by_name
+        await processItem(order, item, "approved", snNotes);
+      } catch (err) {
+        Swal.fire("Gagal", err.message, "error");
+      }
+    };
+
+    const processItem = async (order, item, status, snNotes = "") => {
+      OrdersPage.state.isProcessing = true;
+      Swal.fire({
+        title: "Memproses Item...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      await supabase
+        .from("order_items")
+        .update({
+          status: status,
+          sn_list: snNotes,
+        })
+        .eq("id", item.id);
+
+      const { data: remaining } = await supabase
+        .from("order_items")
+        .select("id")
+        .eq("order_id", order.id)
+        .eq("status", "pending");
+
+      if (!remaining || remaining.length === 0) {
         await supabase
           .from("orders")
           .update({
-            status,
+            status: "processed",
             processed_at: new Date().toISOString(),
-            processed_by: userData.id,
             processed_by_name: userData.nama_lengkap,
-            notes: orderNotes,
           })
           .eq("id", order.id);
-
-        // MODIFIKASI: Catat ke Audit Log
-        const actionLabel = status === "approved" ? "APPROVE" : "REJECT";
-        await window.createAuditLog(
-          actionLabel,
-          "orders",
-          `${actionLabel} order ${order.item_name} x${order.quantity} untuk ${order.requested_by}`
-        );
-
-        Swal.fire({
-          icon: "success",
-          title: "Berhasil",
-          background: "#2f3136",
-          color: "#fff",
-          timer: 1000,
-          showConfirmButton: false,
-        });
-        loadOrders();
-      } catch (err) {
-        if (err.message !== "Dibatalkan")
-          Swal.fire("Gagal", err.message, "error");
-      } finally {
-        OrdersPage.state.isProcessing = false;
       }
+
+      await window.createAuditLog(
+        status.toUpperCase(),
+        "order_items",
+        `${status.toUpperCase()} ${item.item_name} (x${item.quantity}) for ${
+          order.requested_by
+        }`
+      );
+
+      Swal.close();
+      loadOrders();
+      OrdersPage.state.isProcessing = false;
     };
 
     loadOrders();

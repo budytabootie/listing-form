@@ -11,79 +11,104 @@ module.exports = async (req, res) => {
     return res.status(405).json({ message: "Metode tidak diizinkan" });
   }
 
-  const { nama, rank, tipe, subTipe, itemDetail, totalHarga } = req.body;
+  // Menangkap 'items' (Array) yang dikirim dari CartPage baru
+  const { nama, userId, items, totalHarga } = req.body;
 
-  if (!nama || !rank || !tipe) {
-    return res.status(400).json({ success: false, message: "Lengkapi data!" });
+  if (!nama || !userId || !items || !Array.isArray(items)) {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "Data pesanan tidak lengkap atau format salah!",
+      });
   }
 
-  let mentionUser = nama; // Ini untuk notifikasi ping
-
   try {
+    // 1. Ambil data Rank & Discord ID dari tabel members
     const { data: member } = await supabase
       .from("members")
-      .select("discord_id")
+      .select("rank, discord_id")
       .eq("nama", nama)
       .maybeSingle();
 
-    if (member && member.discord_id) {
-      mentionUser = `<@${member.discord_id}>`;
-    }
+    const finalRank = member?.rank || "Member";
+    const mentionUser = member?.discord_id ? `<@${member.discord_id}>` : nama;
 
+    // 2. INSERT KE TABEL UTAMA (orders) - Sebagai Kepala Pesanan
+    const { data: newOrder, error: dbError } = await supabase
+      .from("orders")
+      .insert([
+        {
+          requested_by: nama,
+          total_price: totalHarga,
+          status: "pending",
+          rank: finalRank,
+          notes: "", // Sekarang notes dikosongkan karena rincian pindah ke tabel item
+          created_at: new Date().toISOString(),
+          // item_name & item_type diisi summary singkat saja untuk fallback database lama
+          item_name: items.map((i) => i.nama).join(", "),
+          item_type: "Multi Items",
+          quantity: items.reduce((sum, i) => sum + (i.qty || 1), 0),
+        },
+      ])
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+
+    // 3. INSERT KE TABEL RINCIAN (order_items) - Memasukkan tiap barang secara terpisah
+    const itemInserts = items.map((item) => ({
+      order_id: newOrder.id, // Menghubungkan ke ID di tabel orders
+      item_name: item.nama,
+      item_type: item.kategori,
+      quantity: item.qty || 1,
+      price: `$${(item.harga * (item.qty || 1)).toLocaleString()}`,
+      status: "pending",
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("order_items")
+      .insert(itemInserts);
+
+    if (itemsError) throw itemsError;
+
+    // 4. GENERATE CUSTOM ORDER ID (Untuk Discord)
+    const now = new Date();
+    const yy = now.getFullYear().toString().slice(-2);
+    const mm = (now.getMonth() + 1).toString().padStart(2, "0");
+    const customOrderId = `NMC-${yy}${mm}-${now.getSeconds()}${now
+      .getMilliseconds()
+      .toString()
+      .slice(0, 2)}`;
+
+    // 5. LOGIKA WEBHOOK DISCORD
+    const discordItemsDetail = items
+      .map((i) => `- ${i.nama} (${i.qty}x)`)
+      .join("\n");
     let targetWebhook = process.env.DISCORD_WEBHOOK_URL;
-    let embedColor = 0x2ecc71;
-    let finalDetail = itemDetail;
+    let embedColor = 0x2ecc71; // Default Hijau
 
-    if (tipe === "Non Bundling") {
-      if (subTipe === "Vest ammo weapon") {
-        targetWebhook = process.env.WEBHOOK_VEST_AMMO;
-        embedColor = 0xe74c3c;
-      } else if (subTipe === "Attachment") {
-        targetWebhook = process.env.WEBHOOK_ATTACHMENT;
-        embedColor = 0x3498db;
-      }
-    } else if (tipe === "Bundling") {
-      // Ambil deskripsi terbaru dari database
-      const { data: paket } = await supabase
-        .from("master_paket")
-        .select("deskripsi_isi")
-        .eq("nama_paket", subTipe)
-        .maybeSingle();
-
-      finalDetail = paket
-        ? paket.deskripsi_isi
-        : "Detail paket tidak ditemukan";
-    }
-
-    if (!targetWebhook) {
-      return res
-        .status(500)
-        .json({ success: false, message: "Webhook URL missing." });
-    }
-
-    const response = await fetch(targetWebhook, {
+    // Kirim ke Discord
+    await fetch(targetWebhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        // Bagian Luar: Tetap pakai mentionUser agar ada bunyi notif/ping
-        content: `🔔 Laporan baru dari ${mentionUser}!`,
+        content: `🔔 Pesanan baru dari ${mentionUser}!`,
         embeds: [
           {
-            title: "🛒 New Listing Order",
-            description: `Laporan masuk untuk member: **${nama}**`,
+            title: "🛒 New Listing Order (Relational)",
             color: embedColor,
             fields: [
-              // Bagian Dalam: Pakai 'nama' (teks asli) agar tampilan rapi
-              { name: "👤 Nama", value: nama, inline: true },
-              { name: "🎖️ Rank", value: rank, inline: true },
               {
-                name: "📦 Category",
-                value: `${tipe} > ${subTipe}`,
+                name: "🆔 Order ID",
+                value: `**${customOrderId}**`,
                 inline: true,
               },
+              { name: "👤 Nama", value: nama, inline: true },
+              { name: "🎖️ Rank", value: finalRank, inline: true },
               {
                 name: "📝 Items Detail",
-                value: `\`\`\`${finalDetail}\`\`\``,
+                value: `\`\`\`${discordItemsDetail}\`\`\``,
                 inline: false,
               },
               {
@@ -92,27 +117,16 @@ module.exports = async (req, res) => {
                 inline: false,
               },
             ],
-            footer: { text: `Nakama MC | Category: ${subTipe}` },
+            footer: { text: `Nakama System | Status: PENDING` },
             timestamp: new Date(),
           },
         ],
       }),
     });
 
-    if (response.ok) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Berhasil dikirim!" });
-    } else {
-      const errText = await response.text();
-      return res
-        .status(response.status)
-        .json({ success: false, message: "Discord Error", detail: errText });
-    }
+    return res.status(200).json({ success: true, orderId: customOrderId });
   } catch (error) {
     console.error("Server Error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal Server Error" });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

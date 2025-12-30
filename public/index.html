@@ -47,6 +47,13 @@
             </div>
 
             <div class="portal-nav-actions" id="portalNavActionsDesktop">
+                <button onclick="loadPage('cart')" title="Keranjang Belanja" class="portal-icon-btn"
+                    style="position: relative; color: #43b581;">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span id="cart-count-badge"
+                        style="position: absolute; top: -5px; right: -5px; background: #f04747; color: white; width: 18px; height: 18px; border-radius: 50%; font-size: 0.65rem; display: none; align-items: center; justify-content: center; font-weight: bold; border: 2px solid #202225;">0</span>
+                </button>
+
                 <button onclick="changePassword()" title="Ganti Password" class="portal-icon-btn">
                     <i class="fas fa-key"></i>
                 </button>
@@ -81,7 +88,12 @@
         <hr class="portal-mobile-separator">
 
         <div class="portal-mobile-section portal-mobile-user">
-            <div class="portal-user-info">
+            <button onclick="loadPage('cart')" class="portal-nav-link"
+                style="color: #43b581; border: none; background: none; width: 100%; text-align: left; cursor: pointer;">
+                <i class="fas fa-shopping-cart"></i> Keranjang Pesanan
+            </button>
+
+            <div class="portal-user-info" style="margin-top: 10px;">
                 <span id="userNameDisplayMobile">User</span>
                 <span class="portal-user-status">● ONLINE</span>
             </div>
@@ -90,7 +102,6 @@
                 <button onclick="changePassword()" title="Ganti Password" class="portal-icon-btn">
                     <i class="fas fa-key"></i>
                 </button>
-
                 <button onclick="logout()" class="portal-logout-btn">
                     <i class="fas fa-sign-out-alt"></i> LOGOUT
                 </button>

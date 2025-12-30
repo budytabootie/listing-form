@@ -7,18 +7,19 @@ async function initSupabase() {
     const config = await response.json();
     _supabase = supabase.createClient(config.supabaseUrl, config.supabaseKey);
 
-    // Cek Session Token yang sudah ada
     const token = localStorage.getItem("sessionToken");
     if (token) {
+      // Perbaikan query join menggunakan kolom user_id
       const { data, error } = await _supabase
         .from("user_sessions")
-        .select("*, users_login(role)")
+        .select("token, users_login!user_id(role_id)")
         .eq("token", token)
         .gt("expires_at", new Date().toISOString())
-        .single();
+        .maybeSingle();
 
-      if (data && !error) {
-        redirectUser(data.users_login.role);
+      if (data && data.users_login && !error) {
+        // Gunakan role_id sesuai kesepakatan
+        redirectUser(data.users_login.role_id);
       } else {
         localStorage.removeItem("sessionToken");
       }
@@ -28,9 +29,10 @@ async function initSupabase() {
   }
 }
 
-function redirectUser(role) {
-  const userRole = (role || "user").toLowerCase();
-  if (userRole === "admin" || userRole === "superadmin") {
+function redirectUser(roleId) {
+  // Role ID 4 adalah Member (berdasarkan kode script.js kamu)
+  // Selain 4 (1, 2, atau 3) biasanya Admin/Superadmin
+  if (roleId !== 4) {
     window.location.href = "/admin/";
   } else {
     window.location.href = "/";
@@ -86,7 +88,7 @@ loginForm.onsubmit = async (e) => {
     if (sessErr) throw new Error("Gagal membuat session.");
 
     localStorage.setItem("sessionToken", sessionToken);
-    redirectUser(user.role);
+    redirectUser(user.role_id);
   } catch (err) {
     Swal.fire({
       title: "Gagal Login",
