@@ -7,7 +7,7 @@ export const HomePage = {
 
     return `
     <div class="portal-welcome">
-        <h2 style="color: #fff; margin-bottom: 5px; text-align:center;">Nakama Equipment Center</h2>
+        <h2 style="color: #fff; margin-bottom: 5px; text-align:center;">Nakama Management Center</h2>
         <p style="color: #b9bbbe; margin-bottom: 30px; text-align:center;">Halo, ${
           userData?.nama_lengkap || "Nakama"
         }! Pilih kategori untuk mulai belanja.</p>
@@ -24,8 +24,7 @@ export const HomePage = {
                 </div>
             </div>
             <i class="fas fa-chevron-right" style="color: #43b581;"></i>
-        </div>
-        `
+        </div>`
             : ""
         }
 
@@ -59,14 +58,6 @@ export const HomePage = {
                 <div class="cat-info">
                     <h3>ATTACHMENT</h3>
                     <p>Modifikasi & Scope</p>
-                </div>
-            </div>
-
-            <div class="cat-card" onclick="loadPage('drugs')">
-                <div class="cat-icon" style="color: #43b581;"><i class="fas fa-pills"></i></div>
-                <div class="cat-info">
-                    <h3>DRUGS</h3>
-                    <p>Barang farmasi khusus</p>
                 </div>
             </div>
 

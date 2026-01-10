@@ -1,0 +1,8 @@
+POST https://djvihsohbbpwzpfjahow.supabase.co/functions/v1/discord-notifier
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqdmloc29oYmJwd3pwZmphaG93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NDQ0MDQsImV4cCI6MjA4MjEyMDQwNH0.5b0eGa7jBoZ02gCIlYEbdpMRTIp70pQZg6ht4wcn8ok
+
+{
+    "discord_id": "570875316722073601",
+    "message": "Tes dari VS Code REST Client: Bot Discord OK!"
+}

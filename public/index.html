@@ -12,6 +12,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 
 <body class="portal-body">
@@ -28,14 +29,8 @@
                 <a href="#" class="portal-nav-link" id="nav-home" onclick="loadPage('home')">
                     <i class="fas fa-home"></i> Home
                 </a>
-                <a href="#" class="portal-nav-link" id="nav-listing" onclick="loadPage('listing')">
-                    <i class="fas fa-list-ul"></i> Listing
-                </a>
                 <a href="#" class="portal-nav-link" id="nav-history" onclick="loadPage('history')">
                     <i class="fas fa-history"></i> History
-                </a>
-                <a href="#" class="portal-nav-link" id="nav-setoran" onclick="loadPage('setoran')">
-                    <i class="fas fa-hand-holding-dollar"></i> Setoran
                 </a>
             </div>
 
@@ -74,14 +69,8 @@
             <a href="#" class="portal-nav-link" onclick="loadPage('home')">
                 <i class="fas fa-home"></i> Home
             </a>
-            <a href="#" class="portal-nav-link" onclick="loadPage('listing')">
-                <i class="fas fa-list-ul"></i> Listing
-            </a>
             <a href="#" class="portal-nav-link" onclick="loadPage('history')">
                 <i class="fas fa-history"></i> History
-            </a>
-            <a href="#" class="portal-nav-link" onclick="loadPage('setoran')">
-                <i class="fas fa-hand-holding-dollar"></i> Setoran
             </a>
         </div>
 
@@ -115,6 +104,26 @@
             <p>MEMUAT PORTAL NAKAMA...</p>
         </div>
     </div>
+
+    <footer class="portal-disclaimer">
+        <div class="disclaimer-content">
+            <i class="fas fa-info-circle disclaimer-icon"></i>
+            <div class="disclaimer-text">
+                <p><strong>PENGUMUMAN PENTING: ROLEPLAY ONLY</strong></p>
+                <p>
+                    Portal Nakama MC adalah sistem manajemen internal fiktif yang dikhususkan hanya untuk kebutuhan
+                    <strong>Game Roleplay (GTA V)</strong>. Seluruh transaksi, item (Senjata, Amunisi, dll), dan mata
+                    uang
+                    yang tertera di situs ini adalah <strong>ASET DIGITAL/FIKTIF</strong>.
+                </p>
+                <p>
+                    Kami <strong>TIDAK MELAKUKAN</strong> penjualan barang nyata. Penggunaan nama dan visual hanya
+                    bertujuan untuk simulasi permainan peran. Segala bentuk penyalahgunaan di luar konteks game
+                    adalah di luar tanggung jawab kami.
+                </p>
+            </div>
+        </div>
+    </footer>
 
     <script type="module" src="script.js"></script>
 

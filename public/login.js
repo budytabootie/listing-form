@@ -9,17 +9,18 @@ async function initSupabase() {
 
     const token = localStorage.getItem("sessionToken");
     if (token) {
-      // Perbaikan query join menggunakan kolom user_id
       const { data, error } = await _supabase
         .from("user_sessions")
-        .select("token, users_login!user_id(role_id)")
+        .select("token, users_login!user_id(role_id, has_changed_password)")
         .eq("token", token)
         .gt("expires_at", new Date().toISOString())
         .maybeSingle();
 
       if (data && data.users_login && !error) {
-        // Gunakan role_id sesuai kesepakatan
-        redirectUser(data.users_login.role_id);
+        redirectUser(
+          data.users_login.role_id,
+          data.users_login.has_changed_password
+        );
       } else {
         localStorage.removeItem("sessionToken");
       }
@@ -29,17 +30,24 @@ async function initSupabase() {
   }
 }
 
-function redirectUser(roleId) {
-  // Role ID 4 adalah Member (berdasarkan kode script.js kamu)
-  // Selain 4 (1, 2, atau 3) biasanya Admin/Superadmin
+function redirectUser(roleId, hasChangedPassword) {
+  // JIKA BELUM GANTI PASSWORD, PAKSA KE HALAMAN CHANGE PASSWORD
+  if (hasChangedPassword === false) {
+    // Note: Jika Anda menggunakan modal Swal di frontpage untuk force change,
+    // arahkan saja ke "/" karena init() di frontpage akan mendeteksinya.
+    window.location.href = "/";
+    return;
+  }
+
+  // JIKA ROLE BUKAN MEMBER (Role 1, 2, 3, 5, dll)
+  // Arahkan ke frontpage (/) agar script.js frontpage bisa memunculkan MODAL PILIHAN
   if (roleId !== 4) {
-    window.location.href = "/admin/";
+    window.location.href = "/";
   } else {
     window.location.href = "/";
   }
 }
 
-// Ganti bagian loginForm.onsubmit di login.js:
 loginForm.onsubmit = async (e) => {
   e.preventDefault();
   if (!_supabase) return;
@@ -52,7 +60,6 @@ loginForm.onsubmit = async (e) => {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memverifikasi...';
 
   try {
-    // 1. Ambil data user dulu
     const { data: user, error } = await _supabase
       .from("users_login")
       .select("*")
@@ -61,21 +68,23 @@ loginForm.onsubmit = async (e) => {
 
     if (error || !user) throw new Error("Username atau password salah.");
 
-    // 2. Cek Password (Hybrid: Plain vs Bcrypt)
     let isMatch = false;
+    const hashedInput = CryptoJS.SHA256(passwordInput).toString();
+
     if (user.is_encrypted) {
-      const { data: isValid } = await _supabase.rpc("check_password_v2", {
-        u_id: user.id,
-        pass_input: passwordInput,
-      });
-      isMatch = isValid;
+      isMatch = user.password === hashedInput;
     } else {
       isMatch = user.password === passwordInput;
+      if (isMatch) {
+        await _supabase
+          .from("users_login")
+          .update({ password: hashedInput, is_encrypted: true })
+          .eq("id", user.id);
+      }
     }
 
     if (!isMatch) throw new Error("Username atau password salah.");
 
-    // 3. Buat Session Token
     const sessionToken = crypto.randomUUID();
     const { error: sessErr } = await _supabase.from("user_sessions").insert([
       {
@@ -87,8 +96,21 @@ loginForm.onsubmit = async (e) => {
 
     if (sessErr) throw new Error("Gagal membuat session.");
 
+    // SET SESSION DATA
     localStorage.setItem("sessionToken", sessionToken);
-    redirectUser(user.role_id);
+    localStorage.setItem(
+      "nmc_session",
+      JSON.stringify({
+        id: user.id,
+        username: user.username,
+        role_id: user.role_id,
+      })
+    );
+
+    // TIKET UNTUK MEMUNCULKAN PILIHAN MENU DI FRONTPAGE
+    sessionStorage.setItem("justLoggedIn", "true");
+
+    redirectUser(user.role_id, user.has_changed_password);
   } catch (err) {
     Swal.fire({
       title: "Gagal Login",

@@ -10,6 +10,12 @@ body {
   color: #fff;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+
+  /* Tambahan baru */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh; /* Pastikan body setinggi layar */
+  margin: 0;
 }
 
 /* ==============================
@@ -206,12 +212,15 @@ body {
 /* Old class name support (if still used) */
 .content-container,
 .portal-content {
-  padding-top: 80px; /* space for fixed nav */
-  min-height: 100vh;
+  padding-top: 80px;
   width: 95%;
   max-width: 1200px;
   margin: 0 auto;
   box-sizing: border-box;
+
+  /* Ubah ini: */
+  flex: 1; /* Ini akan membuat konten "menarik" sisa ruang yang kosong */
+  /* Hapus atau komentari min-height: 100vh; */
 }
 
 /* Loading placeholder style */
@@ -547,7 +556,7 @@ body {
    CATEGORY SPECIFIC PAGE (Weapon, etc)
 ============================== */
 .category-page {
-  max-width: 600px;
+  /* max-width: 600px; */
   margin: 20px auto;
   animation: fadeIn 0.4s ease;
 }
@@ -592,20 +601,30 @@ body {
   font-size: 0.9rem;
 }
 
-/* Weapon Page Specific Styles */
-.page-header-weapon {
+/* ==============================
+   GENERAL CATEGORY PAGE STYLES
+============================== */
+
+/* Header utama yang tadinya page-header-weapon */
+.category-header {
   display: flex;
   align-items: center;
+  /* Gunakan variabel untuk warna tema, default ke oranye ammo */
   background: linear-gradient(
     90deg,
-    rgba(240, 71, 71, 0.2) 0%,
+    var(--header-bg, rgba(250, 166, 26, 0.2)) 0%,
     transparent 100%
   );
   padding: 20px;
   border-radius: 15px;
   margin-bottom: 30px;
-  border-left: 4px solid #f04747;
+  border-left: 4px solid var(--header-color, #faa61a);
   position: relative;
+}
+
+/* Container utama yang tadinya weapon-main-container */
+.category-main-content {
+  width: 100%;
 }
 
 .back-btn-modern {
@@ -621,17 +640,18 @@ body {
 }
 
 .back-btn-modern:hover {
-  background: #f04747;
-  border-color: #f04747;
+  background: var(--header-color, #faa61a);
+  border-color: var(--header-color, #faa61a);
 }
 
 .header-title h2 {
   margin: 0;
   font-size: 1.5rem;
   letter-spacing: 2px;
+  color: #fff;
 }
 
-.header-title span {
+.header-subtitle {
   font-size: 0.8rem;
   color: #b9bbbe;
 }
@@ -841,4 +861,249 @@ body {
   cursor: pointer;
   text-decoration: underline;
   font-size: 0.9rem;
+}
+
+/* Card Container Grid */
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+/* Base Card Style */
+.item-card {
+  background: #2f3136;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #40444b;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease-in-out;
+}
+
+.item-card:hover:not(.disabled) {
+  transform: translateY(-5px);
+  border-color: var(--header-color, #5865f2);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+}
+
+.item-card.disabled {
+  opacity: 0.6;
+  filter: grayscale(0.8);
+}
+
+/* ==============================
+    DISCLAIMER SECTION
+============================== */
+.portal-disclaimer {
+  background: #202225;
+  border-top: 1px solid #4f545c;
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: auto; /* Memastikan footer tetap di bawah jika konten flex:1 bekerja */
+}
+
+.disclaimer-content {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.disclaimer-icon {
+  font-size: 2rem;
+  color: #faa61a; /* Warna peringatan */
+  opacity: 0.8;
+}
+
+.disclaimer-text {
+  color: #72767d;
+  font-size: 0.75rem;
+  text-align: left;
+  line-height: 1.6;
+}
+
+.disclaimer-text p {
+  margin: 5px 0;
+}
+
+.disclaimer-text strong {
+  color: #b9bbbe;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive Disclaimer */
+@media (max-width: 600px) {
+  .disclaimer-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .disclaimer-text {
+    text-align: center;
+  }
+}
+
+/* Container Utama */
+.history-table-wrapper {
+  background: #202225;
+  border-radius: 15px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+}
+
+/* Header Table */
+.history-table-header {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 15px 25px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #72767d;
+  letter-spacing: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Row Item */
+.history-row-item {
+  display: flex;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  transition: all 0.3s ease;
+}
+
+.history-row-item:hover {
+  background: rgba(88, 101, 242, 0.05);
+  padding-left: 30px; /* Efek geser sedikit saat hover */
+}
+
+/* Kolom-kolom */
+.col-date {
+  width: 100px;
+  flex-shrink: 0;
+}
+.col-main {
+  flex-grow: 1;
+  padding: 0 20px;
+}
+.col-status {
+  width: 140px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Styling Text */
+.date-txt {
+  font-weight: 700;
+  color: #fff;
+  font-size: 0.9rem;
+}
+.time-txt {
+  color: #72767d;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.item-type-tag {
+  font-size: 0.6rem;
+  color: #5865f2;
+  font-weight: 900;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.item-name-row {
+  font-size: 1.1rem;
+  color: #eee;
+  font-weight: 600;
+}
+.qty-badge {
+  color: #faa61a;
+  font-size: 0.9rem;
+  margin-left: 10px;
+}
+.item-price-row {
+  color: #43b581;
+  font-weight: bold;
+  font-size: 0.85rem;
+  margin-top: 3px;
+}
+
+/* Status Pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.st-pending {
+  color: #faa61a;
+  border: 1px solid #faa61a;
+  background: rgba(250, 166, 26, 0.05);
+}
+.st-success {
+  color: #43b581;
+  border: 1px solid #43b581;
+  background: rgba(67, 181, 129, 0.05);
+}
+.st-error {
+  color: #f04747;
+  border: 1px solid #f04747;
+  background: rgba(240, 71, 71, 0.05);
+}
+
+/* State Kosong */
+.empty-history {
+  padding: 60px;
+  text-align: center;
+  color: #4f545c;
+  font-family: monospace;
+  font-size: 1rem;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+}
+
+/* Responsive Mobile */
+@media (max-width: 768px) {
+  .history-table-header {
+    display: none;
+  }
+  .history-row-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+    position: relative;
+  }
+  .col-status {
+    width: 100%;
+    text-align: left;
+  }
+  .col-date {
+    border-bottom: 1px solid #4f545c;
+    width: 100%;
+    padding-bottom: 10px;
+  }
+}
+
+.swal2-input:focus {
+  border-color: #faa61a !important;
+  box-shadow: 0 0 5px rgba(250, 166, 26, 0.5) !important;
+}
+
+.swal2-validation-message {
+  background: #f04747 !important;
+  color: white !important;
+  border-radius: 5px !important;
+  margin-top: 10px !important;
 }
