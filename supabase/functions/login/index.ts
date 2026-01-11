@@ -15,6 +15,14 @@ Deno.serve(async (req) => {
   const supabaseAdmin = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    {
+      global: {
+        headers: {
+          // Mengambil dari secret yang baru saja kita set
+          "x-custom-auth": Deno.env.get("ADMIN_SECRET_TOKEN") ?? "",
+        },
+      },
+    },
   );
 
   let inputUsername = "";

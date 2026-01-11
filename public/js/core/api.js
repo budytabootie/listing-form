@@ -34,7 +34,10 @@ export const API = {
     try {
       const response = await fetch(`${this._functionUrl}/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          apikey: this._supabase.supabaseKey, // Menggunakan Anon Key dari inisialisasi
+        },
         body: JSON.stringify({ username, password }),
       });
 
