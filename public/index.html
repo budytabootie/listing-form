@@ -43,8 +43,9 @@
             <div class="portal-divider"></div>
 
             <div class="portal-user-info">
-                <span id="userNameDisplay">User</span>
-                <span class="portal-user-status">● ONLINE</span>
+                <span id="userNameDisplay">Memuat...</span>
+                <span class="portal-user-status" id="userRankDisplay"
+                    style="color: #43b581; font-size: 0.7rem; display: block;">ONLINE</span>
             </div>
 
             <div class="portal-nav-actions" id="portalNavActionsDesktop">
@@ -104,12 +105,12 @@
         </div>
     </div>
 
-    <div id="content-area" class="portal-content">
+    <main id="content-area" class="portal-content">
         <div class="portal-loading-block">
             <i class="fas fa-circle-notch fa-spin fa-3x"></i>
             <p>MEMUAT PORTAL NAKAMA...</p>
         </div>
-    </div>
+    </main>
 
     <footer class="portal-disclaimer">
         <div class="disclaimer-content">
@@ -150,11 +151,14 @@
         }
 
         // Fungsi Global untuk sinkronisasi nama dari script.js
-        window.syncUserUI = (name) => {
+        window.syncUserUI = (name, rank) => {
             const elDesktop = document.getElementById('userNameDisplay');
             const elMobile = document.getElementById('userNameDisplayMobile');
+            const elRank = document.getElementById('userRankDisplay'); // Jika ada element rank
+
             if (elDesktop) elDesktop.textContent = name;
             if (elMobile) elMobile.textContent = name;
+            if (elRank) elRank.textContent = rank;
         };
     </script>
 </body>

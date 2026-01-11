@@ -10,12 +10,12 @@ body {
   color: #fff;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-
-  /* Tambahan baru */
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh; /* Pastikan body setinggi layar */
   margin: 0;
+
+  /* Layout Logic */
+  display: none; /* Tetap sembunyi awal */
+  flex-direction: column;
+  min-height: 100vh; /* Memaksa tinggi layar penuh */
 }
 
 /* ==============================
@@ -211,16 +211,15 @@ body {
 
 /* Old class name support (if still used) */
 .content-container,
+/* Area konten akan mengambil sisa ruang yang ada (push footer ke bawah) */
 .portal-content {
-  padding-top: 80px;
+  flex: 1 0 auto;
+  padding-top: 100px;
+  padding-bottom: 40px;
   width: 95%;
   max-width: 1200px;
   margin: 0 auto;
   box-sizing: border-box;
-
-  /* Ubah ini: */
-  flex: 1; /* Ini akan membuat konten "menarik" sisa ruang yang kosong */
-  /* Hapus atau komentari min-height: 100vh; */
 }
 
 /* Loading placeholder style */
@@ -896,22 +895,24 @@ body {
 /* ==============================
     DISCLAIMER SECTION
 ============================== */
+/* Styling Footer agar rapi di bawah */
 .portal-disclaimer {
+  flex-shrink: 0;
   background: #202225;
-  border-top: 1px solid #4f545c;
-  padding: 20px;
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: auto; /* Memastikan footer tetap di bawah jika konten flex:1 bekerja */
+  padding: 30px 20px;
+  border-top: 2px solid #5865f2;
+  margin-top: auto;
 }
 
+/* Tambahan agar teks di dalam footer tidak berantakan */
 .disclaimer-content {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
   display: flex;
   gap: 20px;
   align-items: center;
-  justify-content: center;
+  color: #b9bbbe;
+  font-size: 0.85rem;
 }
 
 .disclaimer-icon {
@@ -1124,5 +1125,16 @@ body {
   display: none;
 }
 body.access-granted {
-  display: block;
+  display: flex !important;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.portal-content {
+  flex: 1 0 auto;
+}
+
+.portal-disclaimer {
+  margin-top: auto;
+  flex-shrink: 0;
 }

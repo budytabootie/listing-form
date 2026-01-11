@@ -1,5 +1,5 @@
 import { GlobalCart } from "./globalCart.js";
-import { API } from "../js/core/api.js"; // Import API wrapper
+import { API } from "../js/core/api.js";
 
 export const AmmoPage = {
   state: { items: [] },
@@ -9,8 +9,6 @@ export const AmmoPage = {
       ? `$ ${Number(item.harga_satuan).toLocaleString()}`
       : "$ 0";
 
-    // Logika deskripsi senjata yang kompatibel
-    // Jika kolom 'deskripsi' di DB berisi: "9mm, Compatible: Glock, Sig Sauer"
     const compatibleInfo = item.deskripsi || "Amunisi standar operasional.";
 
     return `
@@ -40,12 +38,9 @@ export const AmmoPage = {
               <h3 style="color: #fff; margin: 0 0 4px 0; font-size: 1.1rem; letter-spacing: 0.5px;">${
                 item.nama_barang
               }</h3>
-              
               <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; margin-bottom: 20px; border-left: 3px solid #faa61a;">
                 <p style="color: #8e9297; font-size: 0.7rem; text-transform: uppercase; font-weight: 800; margin: 0 0 4px 0;">Cocok Untuk:</p>
-                <p style="color: #b9bbbe; font-size: 0.85rem; line-height: 1.4; margin: 0; font-style: italic;">
-                  ${compatibleInfo}
-                </p>
+                <p style="color: #b9bbbe; font-size: 0.85rem; line-height: 1.4; margin: 0; font-style: italic;">${compatibleInfo}</p>
               </div>
           </div>
           <button onclick="${
@@ -74,25 +69,27 @@ export const AmmoPage = {
     <div class="selection-container">
         <div class="order-card-modern">
             <div class="selected-item-info">
-                <span class="label">Item:</span>
-                <h3 class="item-name-display" style="color: #faa61a;">${itemName}</h3>
-                <div style="color: #43b581; font-weight: bold;">$${Number(
+                <span class="label" style="display:block; margin-bottom:5px; color:#b9bbbe; font-size:0.8rem;">Item Terpilih:</span>
+                <h3 class="item-name-display" style="color: #faa61a; margin:0; font-size:1.5rem;">${itemName}</h3>
+                <div style="color: #43b581; font-weight: bold; margin-top:5px;">$${Number(
                   price
                 ).toLocaleString()} / Unit</div>
             </div>
-            <div class="input-group-modern">
-                <label>Jumlah Amunisi</label>
-                <div class="qty-wrapper-modern" style="border-color: #4f545c;">
-                    <button class="qty-ctrl" onclick="this.nextElementSibling.stepDown(); event.stopPropagation();">-</button>
-                    <input type="number" id="ammoQty" value="1" min="1" max="${availableStock}">
-                    <button class="qty-ctrl" onclick="this.previousElementSibling.stepUp(); event.stopPropagation();">+</button>
+            <div class="input-group-modern" style="margin: 25px 0;">
+                <label style="display:block; margin-bottom:10px; color:#b9bbbe; font-size:0.9rem;">Tentukan Jumlah</label>
+                <div class="qty-wrapper-modern" style="display:flex; align-items:center; background:#18191c; border-radius:10px; padding:5px; border:1px solid #4f545c;">
+                    <button class="qty-ctrl" style="width:45px; height:45px; background:none; border:none; color:white; font-size:1.2rem; cursor:pointer;" onclick="this.nextElementSibling.stepDown()">-</button>
+                    <input type="number" id="ammoQty" value="1" min="1" max="${availableStock}" style="flex:1; background:none; border:none; color:white; text-align:center; font-weight:bold; font-size:1.1rem; outline:none;">
+                    <button class="qty-ctrl" style="width:45px; height:45px; background:none; border:none; color:white; font-size:1.2rem; cursor:pointer;" onclick="this.previousElementSibling.stepUp()">+</button>
                 </div>
             </div>
             <div class="status-container">
-                <div class="stock-badge-modern" style="border-color: #43b581;">Tersedia: ${availableStock}</div>
+                <div class="stock-badge-modern" style="border:1px dashed #43b581; color:#43b581; text-align:center; padding:10px; border-radius:8px; font-size:0.85rem; margin-bottom:20px;">
+                    Stok Tersedia: ${availableStock}
+                </div>
             </div>
-            <button id="submitAmmo" class="btn-submit-weapon" style="background: #faa61a;">MASUKKAN KERANJANG</button>
-            <button onclick="window.loadPage('ammo')" class="btn-cancel-weapon">Batal</button>
+            <button id="btnAddToCart" class="btn-submit-weapon" style="background: #faa61a; width:100%; padding:15px; border:none; border-radius:12px; color:white; font-weight:bold; cursor:pointer; font-size:1rem;">MASUKKAN KERANJANG</button>
+            <button onclick="window.loadPage('ammo')" class="btn-cancel-weapon" style="width:100%; background:none; border:none; color:#72767d; margin-top:15px; cursor:pointer; text-decoration:underline; font-size:0.9rem;">Kembali ke Katalog</button>
         </div>
     </div>
   `,
@@ -116,39 +113,67 @@ export const AmmoPage = {
     const container = document.getElementById("ammoList");
     if (!container) return;
 
-    // Di dalam ammo.js bagian loadAmmo
+    window.openOrderAmmo = (itemName, stock, price) => {
+      const mainContainer = document.getElementById("ammo-main-container");
+      mainContainer.innerHTML = AmmoPage.renderOrderForm(
+        itemName,
+        stock,
+        price
+      );
+
+      document.getElementById("btnAddToCart").onclick = () => {
+        const qty = parseInt(document.getElementById("ammoQty").value);
+        if (qty > 0 && qty <= stock) {
+          // Sinkron dengan globalCart.js: nama, harga, qty, kategori
+          GlobalCart.addToCart(
+            {
+              nama: itemName,
+              harga: price,
+              qty: qty,
+              kategori: "Ammo",
+            },
+            stock
+          );
+          window.loadPage("ammo");
+        }
+      };
+    };
+
     const loadAmmo = async () => {
       try {
         const { data: katalog, error: errKatalog } =
           await API.getItemsByCategory("Ammo");
         const { data: inventory, error: errInv } = await API.getInventory();
 
-        if (errKatalog) {
-          console.error("Error Katalog:", errKatalog.message);
-          return;
-        }
+        if (errKatalog) throw errKatalog;
 
-        // Gunakan array kosong jika data null
         const safeKatalog = katalog || [];
         const safeInventory = inventory || [];
 
-        AmmoPage.state.items = safeKatalog.map((a) => ({
-          ...a,
-          // Fallback stok jika tidak ada di inventory
-          stok:
-            (safeInventory.find((i) => i.item_name === a.nama_barang)?.stock ||
-              0) - GlobalCart.getQtyInCart(a.nama_barang),
-        }));
+        AmmoPage.state.items = safeKatalog.map((a) => {
+          const invData = safeInventory.find(
+            (i) => i.item_name === a.nama_barang
+          );
+          const dbStock = invData ? invData.stock : 0;
+          // Memastikan memanggil nama_barang agar sinkron dengan getQtyInCart
+          const cartQty = GlobalCart.getQtyInCart(a.nama_barang);
+
+          return {
+            ...a,
+            stok: dbStock - cartQty,
+          };
+        });
 
         renderAmmo();
       } catch (error) {
         console.error("System Error:", error);
+        container.innerHTML = `<p style="color:#ed4245; text-align:center; grid-column:1/-1;">Gagal sinkronisasi data amunisi.</p>`;
       }
     };
 
     const renderAmmo = () => {
       if (AmmoPage.state.items.length === 0) {
-        container.innerHTML = `<p style="color:white; text-align:center; grid-column:1/-1;">Tidak ada amunisi tersedia.</p>`;
+        container.innerHTML = `<p style="color:white; text-align:center; grid-column:1/-1;">Tidak ada amunisi tersedia saat ini.</p>`;
         return;
       }
       container.innerHTML = AmmoPage.state.items

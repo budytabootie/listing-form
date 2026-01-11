@@ -9,78 +9,88 @@ export const OrdersPage = {
 
   render: () => `
         <div class="header-container">
-            <h2>Pending Orders</h2>
+            <h2 style="color: #fff; margin-bottom: 10px;">Pending Orders</h2>
             <p style="color: #b9bbbe; margin-top: -10px; font-size: 0.9rem;">Proses item secara satuan. Pesanan otomatis selesai jika semua item sudah diproses.</p>
         </div>
-        <div id="ordersList" style="display: grid; gap: 20px;"></div>
+        <div id="ordersListContainer" style="display: grid; gap: 20px;">
+            <div style="color: #72767d; text-align: center; padding: 20px;">Memuat data pesanan...</div>
+        </div>
     `,
 
   init: async (supabase, userData) => {
-    const container = document.getElementById("ordersList");
+    const container = document.getElementById("ordersListContainer");
+    if (!container) return;
 
     const loadOrders = async () => {
-      const [
-        { data: orders },
-        { data: allItems },
-        { data: inv },
-        { data: weaponStocks },
-        { data: katalog },
-      ] = await Promise.all([
-        supabase
-          .from("orders")
-          .select("*")
-          .eq("status", "pending")
-          .order("created_at", { ascending: false }),
-        supabase.from("order_items").select("*").eq("status", "pending"),
-        supabase.from("inventory").select("item_name, stock"),
-        supabase
-          .from("inventory_weapons")
-          .select("weapon_name")
-          .eq("status", "available")
-          .is("hold_by", null),
-        supabase.from("katalog_barang").select("nama_barang, jenis_barang"),
-      ]);
+      const currentContainer = document.getElementById("ordersListContainer");
+      if (!currentContainer) return;
 
-      const weaponCountMap = (weaponStocks || []).reduce((acc, w) => {
-        acc[w.weapon_name] = (acc[w.weapon_name] || 0) + 1;
-        return acc;
-      }, {});
+      try {
+        const [
+          { data: orders },
+          { data: allItems },
+          { data: inv },
+          { data: weaponStocks },
+          { data: katalog },
+        ] = await Promise.all([
+          supabase
+            .from("orders")
+            .select("*")
+            .eq("status", "pending")
+            .order("created_at", { ascending: false }),
+          supabase.from("order_items").select("*").eq("status", "pending"),
+          supabase.from("inventory").select("item_name, stock"),
+          supabase
+            .from("inventory_weapons")
+            .select("weapon_name")
+            .eq("status", "available")
+            .is("hold_by", null),
+          supabase.from("katalog_barang").select("nama_barang, jenis_barang"),
+        ]);
 
-      OrdersPage.state.katalog = katalog || [];
-      OrdersPage.state.inventory = [
-        ...(inv || []),
-        ...Object.entries(weaponCountMap).map(([name, count]) => ({
-          item_name: name,
-          stock: count,
-        })),
-      ];
+        const weaponCountMap = (weaponStocks || []).reduce((acc, w) => {
+          acc[w.weapon_name] = (acc[w.weapon_name] || 0) + 1;
+          return acc;
+        }, {});
 
-      OrdersPage.state.orders = (orders || [])
-        .map((order) => ({
-          ...order,
-          rincian: (allItems || []).filter(
-            (item) => item.order_id === order.id
-          ),
-        }))
-        .filter((order) => order.rincian.length > 0);
+        OrdersPage.state.katalog = katalog || [];
+        OrdersPage.state.inventory = [
+          ...(inv || []),
+          ...Object.entries(weaponCountMap).map(([name, count]) => ({
+            item_name: name,
+            stock: count,
+          })),
+        ];
 
-      renderOrders();
+        OrdersPage.state.orders = (orders || [])
+          .map((order) => ({
+            ...order,
+            rincian: (allItems || []).filter(
+              (item) => item.order_id === order.id
+            ),
+          }))
+          .filter((order) => order.rincian.length > 0);
+
+        renderOrders(currentContainer);
+      } catch (err) {
+        console.error("Load Error:", err);
+      }
     };
 
-    const renderOrders = () => {
+    const renderOrders = (targetEl) => {
       if (OrdersPage.state.orders.length === 0) {
-        container.innerHTML = `<div style="background:#2f3136; padding:40px; border-radius:12px; text-align:center; color:#72767d; border: 1px dashed #4f545c;">Semua item pesanan telah diproses.</div>`;
+        targetEl.innerHTML = `<div style="background:#2f3136; padding:40px; border-radius:12px; text-align:center; color:#72767d; border: 1px dashed #4f545c;">Semua item pesanan telah diproses.</div>`;
         return;
       }
 
-      container.innerHTML = OrdersPage.state.orders
+      targetEl.innerHTML = OrdersPage.state.orders
         .map((order) => {
           const itemsHtml = order.rincian
             .map((item) => {
-              const stockExist =
-                OrdersPage.state.inventory.find(
-                  (i) => i.item_name === item.item_name
-                )?.stock || 0;
+              const stockItem = OrdersPage.state.inventory.find(
+                (i) => i.item_name === item.item_name
+              );
+              const stockExist = stockItem ? stockItem.stock : 0;
               const isStockLow = stockExist < item.quantity;
 
               const categoryColors = {
@@ -89,31 +99,19 @@ export const OrdersPage = {
                 Vest: "#3498db",
                 Attachment: "#e67e22",
               };
-
-              // SOLUSI NULL: Cek item_type di order_items,
-              // jika kosong cek item_type di tabel orders (induk),
-              // jika masih kosong gunakan 'Item'.
               const safeType = item.item_type || order.item_type || "Item";
               const typeColor = categoryColors[safeType] || "#72767d";
 
               return `
               <div style="background:#18191c; margin-top:10px; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; border-left: 4px solid ${typeColor};">
                 <div>
-                  <div style="font-size:0.65rem; color:${typeColor}; font-weight:bold; text-transform:uppercase; margin-bottom:4px;">
-                    ${safeType}
-                  </div>
+                  <div style="font-size:0.65rem; color:${typeColor}; font-weight:bold; text-transform:uppercase; margin-bottom:4px;">${safeType}</div>
                   <div style="color:#fff; font-weight:bold;">${
                     item.item_name
                   } <span style="color:#43b581;">x${item.quantity}</span></div>
                   <div style="font-size:0.75rem; color:${
                     isStockLow ? "#f04747" : "#b9bbbe"
-                  }; font-weight:${isStockLow ? "bold" : "normal"};">
-                    ${
-                      isStockLow
-                        ? '<i class="fas fa-exclamation-triangle"></i> Stok: '
-                        : "Gudang: "
-                    } ${stockExist}
-                  </div>
+                  };">Gudang: ${stockExist}</div>
                 </div>
                 <div style="display:flex; gap:10px;">
                   <button class="btn-item-action" data-item-id="${
@@ -123,40 +121,25 @@ export const OrdersPage = {
                       isStockLow
                         ? 'disabled style="background:#4f545c; opacity:0.5;"'
                         : 'style="background:#43b581; cursor:pointer;"'
-                    }>
-                    APPROVE
-                  </button>
+                    }>APPROVE</button>
                   <button class="btn-item-action" data-item-id="${
                     item.id
                   }" data-order-id="${order.id}" data-action="rejected" 
-                    style="background:#ed4245; cursor:pointer;">
-                    REJECT
-                  </button>
+                    style="background:#ed4245; cursor:pointer;">REJECT</button>
                 </div>
-              </div>
-            `;
+              </div>`;
             })
             .join("");
 
           return `
-            <div class="order-card-container" style="background: #2f3136; border-radius: 12px; padding: 20px; border: 1px solid #4f545c; margin-bottom:15px;">
+            <div class="order-card-container" style="background:#2f3136; border-radius:12px; padding:20px; border:1px solid #4f545c; margin-bottom:15px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #4f545c; padding-bottom:12px; margin-bottom:5px;">
-                  <div>
-                    <h3 style="margin:0; color:#fff; font-size:1.1rem;">${
-                      order.requested_by
-                    }</h3>
-                    <span style="font-size:0.75rem; color:#faa61a; font-weight:bold;">RANK: ${
-                      order.rank || "MEMBER"
-                    }</span>
-                  </div>
-                  <div style="text-align:right;">
-                    <div style="color:#43b581; font-weight:bold; font-size:1rem;">${
-                      order.total_price || "$ 0"
-                    }</div>
-                    <div style="font-size:0.65rem; color:#72767d;">${new Date(
-                      order.created_at
-                    ).toLocaleString()}</div>
-                  </div>
+                  <div><h3 style="margin:0; color:#fff;">${
+                    order.requested_by
+                  }</h3></div>
+                  <div style="text-align:right;"><div style="color:#43b581; font-weight:bold;">${
+                    order.total_price || "$ 0"
+                  }</div></div>
                 </div>
                 <div>${itemsHtml}</div>
             </div>`;
@@ -174,8 +157,8 @@ export const OrdersPage = {
 
       if (action === "rejected") {
         const confirm = await Swal.fire({
-          title: "Reject Item?",
-          text: `Tolak ${item.item_name} untuk ${order.requested_by}?`,
+          title: "Reject?",
+          text: `Tolak ${item.item_name}?`,
           icon: "warning",
           showCancelButton: true,
           confirmButtonColor: "#ed4245",
@@ -201,10 +184,10 @@ export const OrdersPage = {
             .is("hold_by", null);
 
           if (!units || units.length < item.quantity)
-            throw new Error("Stok SN tidak mencukupi!");
+            throw new Error("Stok SN tidak cukup!");
 
           const { value: selectedSns } = await Swal.fire({
-            title: `Pilih ${item.quantity} SN - ${item.item_name}`,
+            title: "Pilih SN",
             background: "#2f3136",
             color: "#fff",
             html: `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">${units
@@ -214,29 +197,30 @@ export const OrdersPage = {
               )
               .join("")}</div>`,
             didOpen: () => {
-              const btns = document.querySelectorAll(".sn-choice");
               let count = 0;
-              btns.forEach(
+              document.querySelectorAll(".sn-choice").forEach(
                 (b) =>
                   (b.onclick = () => {
-                    if (b.classList.contains("selected")) {
-                      b.classList.remove("selected");
+                    if (b.classList.toggle("selected")) {
+                      if (count < item.quantity) {
+                        b.style.background = "#43b58144";
+                        b.style.borderColor = "#43b581";
+                        count++;
+                      } else {
+                        b.classList.remove("selected");
+                      }
+                    } else {
                       b.style.background = "#202225";
+                      b.style.borderColor = "#4f545c";
                       count--;
-                    } else if (count < item.quantity) {
-                      b.classList.add("selected");
-                      b.style.background = "#43b58144";
-                      count++;
                     }
                   })
               );
             },
             preConfirm: () => {
               const sel = document.querySelectorAll(".sn-choice.selected");
-              if (sel.length !== item.quantity) {
-                Swal.showValidationMessage(`Pilih tepat ${item.quantity} SN!`);
-                return false;
-              }
+              if (sel.length !== item.quantity)
+                return Swal.showValidationMessage(`Pilih ${item.quantity} SN!`);
               return Array.from(sel).map((el) => ({
                 id: el.dataset.id,
                 sn: el.dataset.sn,
@@ -253,17 +237,6 @@ export const OrdersPage = {
               "id",
               selectedSns.map((s) => s.id)
             );
-        } else {
-          const { data: inv } = await supabase
-            .from("inventory")
-            .select("id, stock")
-            .eq("item_name", item.item_name)
-            .maybeSingle();
-          if (inv)
-            await supabase
-              .from("inventory")
-              .update({ stock: inv.stock - item.quantity })
-              .eq("id", inv.id);
         }
 
         await processItem(order, item, "approved", snNotes);
@@ -275,47 +248,86 @@ export const OrdersPage = {
     const processItem = async (order, item, status, snNotes = "") => {
       OrdersPage.state.isProcessing = true;
       Swal.fire({
-        title: "Memproses Item...",
+        title: "Processing...",
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
 
-      await supabase
-        .from("order_items")
-        .update({
-          status: status,
-          sn_list: snNotes,
-        })
-        .eq("id", item.id);
+      try {
+        if (status === "approved") {
+          const katalogItem = OrdersPage.state.katalog.find(
+            (k) =>
+              k.nama_barang.trim().toLowerCase() ===
+              item.item_name.trim().toLowerCase()
+          );
+          if (katalogItem && katalogItem.jenis_barang !== "Weapon") {
+            const { data: invData } = await supabase
+              .from("inventory")
+              .select("id, stock")
+              .eq("item_name", item.item_name)
+              .single();
+            if (invData) {
+              await supabase
+                .from("inventory")
+                .update({ stock: invData.stock - item.quantity })
+                .eq("id", invData.id);
+            }
+          }
+        }
 
-      const { data: remaining } = await supabase
-        .from("order_items")
-        .select("id")
-        .eq("order_id", order.id)
-        .eq("status", "pending");
-
-      if (!remaining || remaining.length === 0) {
         await supabase
-          .from("orders")
-          .update({
-            status: "processed",
-            processed_at: new Date().toISOString(),
-            processed_by_name: userData.nama_lengkap,
-          })
-          .eq("id", order.id);
+          .from("order_items")
+          .update({ status: status, sn_list: snNotes })
+          .eq("id", item.id);
+
+        const { data: remaining } = await supabase
+          .from("order_items")
+          .select("id")
+          .eq("order_id", order.id)
+          .eq("status", "pending");
+
+        if (!remaining || remaining.length === 0) {
+          await supabase
+            .from("orders")
+            .update({
+              status: "processed",
+              processed_at: new Date().toISOString(),
+              processed_by_name: userData.nama_lengkap,
+            })
+            .eq("id", order.id);
+        }
+
+        // Audit Log
+        try {
+          await supabase.functions.invoke("admin-actions", {
+            body: {
+              action: "create_audit_log",
+              log_data: {
+                action_type: status.toUpperCase(),
+                target_table: "order_items",
+                details: `${status.toUpperCase()} ${item.item_name} (x${
+                  item.quantity
+                }) untuk ${order.requested_by}`,
+                admin_name: userData.nama_lengkap,
+              },
+            },
+          });
+        } catch (e) {
+          console.warn("Audit log fail");
+        }
+
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          timer: 1000,
+          showConfirmButton: false,
+        });
+      } catch (error) {
+        Swal.fire("Error", error.message || "Gagal memproses item", "error");
+      } finally {
+        await loadOrders();
+        OrdersPage.state.isProcessing = false;
       }
-
-      await window.createAuditLog(
-        status.toUpperCase(),
-        "order_items",
-        `${status.toUpperCase()} ${item.item_name} (x${item.quantity}) for ${
-          order.requested_by
-        }`
-      );
-
-      Swal.close();
-      loadOrders();
-      OrdersPage.state.isProcessing = false;
     };
 
     loadOrders();

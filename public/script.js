@@ -52,9 +52,10 @@ async function init() {
     return PortalUI.forceChangePassword(user);
   }
 
-  // 5. Update Nama Display
-  const elName = document.getElementById("userNameDisplay");
-  if (elName) elName.innerText = user.nama_lengkap;
+  // 5. Update Nama Display ke UI (Desktop & Mobile)
+  if (window.syncUserUI) {
+    window.syncUserUI(user.nama_lengkap, user.rank || "MEMBER");
+  }
 
   // 6. Masuk ke Halaman Default
   Navigation.loadPage("home");

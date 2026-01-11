@@ -15,12 +15,10 @@ module.exports = async (req, res) => {
   const { nama, userId, items, totalHarga } = req.body;
 
   if (!nama || !userId || !items || !Array.isArray(items)) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Data pesanan tidak lengkap atau format salah!",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Data pesanan tidak lengkap atau format salah!",
+    });
   }
 
   try {
@@ -43,11 +41,14 @@ module.exports = async (req, res) => {
           total_price: totalHarga,
           status: "pending",
           rank: finalRank,
-          notes: "", // Sekarang notes dikosongkan karena rincian pindah ke tabel item
           created_at: new Date().toISOString(),
-          // item_name & item_type diisi summary singkat saja untuk fallback database lama
-          item_name: items.map((i) => i.nama).join(", "),
-          item_type: "Multi Items",
+          // SINKRONKAN DENGAN HISTORY PAGE:
+          item_name:
+            items.length > 1
+              ? `${items[0].nama} (+${items.length - 1} lainnya)`
+              : items[0].nama,
+          item_type:
+            items.length > 1 ? "MULTI ITEMS" : items[0].kategori || "General",
           quantity: items.reduce((sum, i) => sum + (i.qty || 1), 0),
         },
       ])
