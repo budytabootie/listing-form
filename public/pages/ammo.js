@@ -1,4 +1,5 @@
 import { GlobalCart } from "./globalCart.js";
+import { API } from "../js/core/api.js"; // Import API wrapper
 
 export const AmmoPage = {
   state: { items: [] },
@@ -7,6 +8,11 @@ export const AmmoPage = {
     const formatHarga = item.harga_satuan
       ? `$ ${Number(item.harga_satuan).toLocaleString()}`
       : "$ 0";
+
+    // Logika deskripsi senjata yang kompatibel
+    // Jika kolom 'deskripsi' di DB berisi: "9mm, Compatible: Glock, Sig Sauer"
+    const compatibleInfo = item.deskripsi || "Amunisi standar operasional.";
+
     return `
       <div class="item-card" style="background: #2f3136; border-radius: 12px; padding: 20px; border: 1px solid #40444b; display: flex; flex-direction: column; transition: transform 0.2s; ${
         isOut ? "opacity: 0.6; filter: grayscale(1);" : ""
@@ -31,10 +37,16 @@ export const AmmoPage = {
               </div>
           </div>
           <div style="flex-grow: 1;">
-              <h3 style="color: #fff; margin: 0 0 8px 0; font-size: 1.1rem; letter-spacing: 0.5px;">${
+              <h3 style="color: #fff; margin: 0 0 4px 0; font-size: 1.1rem; letter-spacing: 0.5px;">${
                 item.nama_barang
               }</h3>
-              <p style="color: #b9bbbe; font-size: 0.8rem; line-height: 1.5; margin-bottom: 20px;">Amunisi standar untuk perbekalan operasional.</p>
+              
+              <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; margin-bottom: 20px; border-left: 3px solid #faa61a;">
+                <p style="color: #8e9297; font-size: 0.7rem; text-transform: uppercase; font-weight: 800; margin: 0 0 4px 0;">Cocok Untuk:</p>
+                <p style="color: #b9bbbe; font-size: 0.85rem; line-height: 1.4; margin: 0; font-style: italic;">
+                  ${compatibleInfo}
+                </p>
+              </div>
           </div>
           <button onclick="${
             isOut
@@ -71,9 +83,9 @@ export const AmmoPage = {
             <div class="input-group-modern">
                 <label>Jumlah Amunisi</label>
                 <div class="qty-wrapper-modern" style="border-color: #4f545c;">
-                    <button class="qty-ctrl" onclick="this.nextElementSibling.stepDown()">-</button>
+                    <button class="qty-ctrl" onclick="this.nextElementSibling.stepDown(); event.stopPropagation();">-</button>
                     <input type="number" id="ammoQty" value="1" min="1" max="${availableStock}">
-                    <button class="qty-ctrl" onclick="this.previousElementSibling.stepUp()">+</button>
+                    <button class="qty-ctrl" onclick="this.previousElementSibling.stepUp(); event.stopPropagation();">+</button>
                 </div>
             </div>
             <div class="status-container">
@@ -89,67 +101,61 @@ export const AmmoPage = {
     <div class="category-page">
         <div class="category-header" style="--header-bg: rgba(250, 166, 26, 0.2); --header-color: #faa61a;">
             <button onclick="window.loadPage('home')" class="back-btn-modern"><i class="fas fa-chevron-left"></i></button>
-            <div class="header-title"><h2>AMMO SUPPLY</h2><span class="header-subtitle">Pastikan stok amunisi Anda selalu terpenuhi</span></div>
+            <div class="header-title"><h2>AMMO SUPPLY</h2><span class="header-subtitle">Pastikan stok amunisi Anda sesuai dengan spesifikasi senjata</span></div>
             <div class="header-icon-main"><i class="fas fa-box-open"></i></div>
         </div>
         <div class="category-main-content" id="ammo-main-container">
             <div class="catalog-grid" id="ammoList">
-                <div style="color: #72767d; text-align: center; padding: 50px; grid-column: 1/-1;"><i class="fas fa-circle-notch fa-spin" style="font-size:2rem; margin-bottom:10px;"></i><p>Mengambil data amunisi...</p></div>
+                <div style="color: #72767d; text-align: center; padding: 50px; grid-column: 1/-1;"><i class="fas fa-circle-notch fa-spin" style="font-size:2rem; margin-bottom:10px;"></i><p>Sinkronisasi data amunisi...</p></div>
             </div>
         </div>
     </div>
   `,
 
-  init: async (supabase) => {
+  init: async () => {
     const container = document.getElementById("ammoList");
     if (!container) return;
 
+    // Di dalam ammo.js bagian loadAmmo
     const loadAmmo = async () => {
-      const { data: katalog } = await supabase
-        .from("katalog_barang")
-        .select("*")
-        .eq("jenis_barang", "Ammo");
-      const { data: inventory } = await supabase
-        .from("inventory")
-        .select("item_name, stock");
+      try {
+        const { data: katalog, error: errKatalog } =
+          await API.getItemsByCategory("Ammo");
+        const { data: inventory, error: errInv } = await API.getInventory();
 
-      AmmoPage.state.items = katalog.map((a) => ({
-        ...a,
-        stok:
-          (inventory.find((i) => i.item_name === a.nama_barang)?.stock || 0) -
-          GlobalCart.getQtyInCart(a.nama_barang),
-      }));
-      renderAmmo();
+        if (errKatalog) {
+          console.error("Error Katalog:", errKatalog.message);
+          return;
+        }
+
+        // Gunakan array kosong jika data null
+        const safeKatalog = katalog || [];
+        const safeInventory = inventory || [];
+
+        AmmoPage.state.items = safeKatalog.map((a) => ({
+          ...a,
+          // Fallback stok jika tidak ada di inventory
+          stok:
+            (safeInventory.find((i) => i.item_name === a.nama_barang)?.stock ||
+              0) - GlobalCart.getQtyInCart(a.nama_barang),
+        }));
+
+        renderAmmo();
+      } catch (error) {
+        console.error("System Error:", error);
+      }
     };
 
     const renderAmmo = () => {
+      if (AmmoPage.state.items.length === 0) {
+        container.innerHTML = `<p style="color:white; text-align:center; grid-column:1/-1;">Tidak ada amunisi tersedia.</p>`;
+        return;
+      }
       container.innerHTML = AmmoPage.state.items
         .map((item) =>
           AmmoPage.renderCard(item, item.stok <= 0 || item.status !== "Ready")
         )
         .join("");
-    };
-
-    window.openOrderAmmo = (name, availableStock, price) => {
-      const mainContainer = document.getElementById("ammo-main-container");
-      if (mainContainer) {
-        mainContainer.innerHTML = AmmoPage.renderOrderForm(
-          name,
-          availableStock,
-          price
-        );
-        document.getElementById("submitAmmo").onclick = () => {
-          const qty = parseInt(document.getElementById("ammoQty").value);
-          if (
-            GlobalCart.addToCart(
-              { nama: name, harga: Number(price), kategori: "Ammo", qty: qty },
-              availableStock + GlobalCart.getQtyInCart(name)
-            )
-          ) {
-            window.loadPage("ammo");
-          }
-        };
-      }
     };
 
     loadAmmo();

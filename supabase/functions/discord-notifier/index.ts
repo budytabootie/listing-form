@@ -1,6 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-
-const BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN')
+// Gunakan standar import terbaru dari Supabase
+/// <reference lib="deno.window" />
+import { serve } from "https://deno.land/std@0.131.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,15 +8,19 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS (Penting agar web bisa panggil fungsi ini)
+  // 1. Handle CORS Preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { discord_id, message } = await req.json()
+    const BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN')
+    if (!BOT_TOKEN) throw new Error("BOT_TOKEN tidak ditemukan di Secrets!")
 
-    // 1. Buat DM Channel
+    const { discord_id, message } = await req.json()
+    if (!discord_id) throw new Error("discord_id wajib diisi!")
+
+    // 2. Buat DM Channel ke User
     const channelRes = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
       method: 'POST',
       headers: {
@@ -26,14 +30,15 @@ serve(async (req) => {
       body: JSON.stringify({ recipient_id: discord_id }),
     })
     
-    const channel = await channelRes.json()
-
-    if (!channel.id) {
-      throw new Error('Gagal membuat DM Channel. Pastikan ID Discord benar dan Bot satu server dengan user.')
+    const channelData = await channelRes.json()
+    
+    if (!channelRes.ok) {
+      console.error("Discord Channel Error:", channelData)
+      throw new Error(`Discord API Error (Channel): ${channelData.message || 'Unknown'}`)
     }
 
-    // 2. Kirim Pesan
-    const messageRes = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
+    // 3. Kirim Pesan ke Channel ID yang didapat
+    const messageRes = await fetch(`https://discord.com/api/v10/channels/${channelData.id}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bot ${BOT_TOKEN}`,
@@ -42,7 +47,14 @@ serve(async (req) => {
       body: JSON.stringify({ content: message }),
     })
 
-    return new Response(JSON.stringify({ success: true }), {
+    const messageData = await messageRes.json()
+
+    if (!messageRes.ok) {
+      console.error("Discord Message Error:", messageData)
+      throw new Error(`Discord API Error (Message): ${messageData.message || 'Unknown'}`)
+    }
+
+    return new Response(JSON.stringify({ success: true, data: messageData }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

@@ -1,4 +1,19 @@
-node_modules
+# Dependency folders
+node_modules/
+
+# Environment variables (PENTING!)
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel & Build folders
 .vercel
-.env*.local
+dist/
+build/
+
+# Supabase local files
+supabase/.temp/
+supabase/.branches/
+supabase/functions/.env

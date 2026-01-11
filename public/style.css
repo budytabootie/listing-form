@@ -9,6 +9,16 @@
   --text-muted: #b9bbbe;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* Mencegah scroll ke samping di level body */
+}
+
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background: var(--bg-dark);
@@ -106,11 +116,16 @@ body {
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  width: 100%;
+
+  /* PERBAIKAN DI SINI: */
+  min-width: 0; /* Mencegah elemen di dalam (tabel) memaksa wrapper melebar */
+  width: auto; /* Jangan pakai 100% jika sudah ada margin-left */
+  max-width: calc(100% - var(--sidebar-width)); /* Kunci lebar maksimal */
 }
 
 .main-wrapper.expanded {
   margin-left: var(--sidebar-collapsed-width);
+  max-width: calc(100% - var(--sidebar-collapsed-width));
 }
 
 /* CSS baru agar halaman Member/User biasa tidak bergeser karena Sidebar Admin */
@@ -127,6 +142,13 @@ body.no-sidebar .main-wrapper {
   display: flex;
   justify-content: center;
   align-items: flex-start;
+}
+
+#content-area {
+  padding: 40px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden; /* Sembunyikan scroll horizontal utama */
 }
 
 /* FORM STYLING */
@@ -607,4 +629,23 @@ footer {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 0.7rem;
+}
+
+/* Menghilangkan panah atas/bawah bawaan browser */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield; /* Untuk Firefox */
+}
+
+/* Sembunyikan body saat loading access */
+body {
+  display: none;
+}
+body.access-granted {
+  display: block;
 }

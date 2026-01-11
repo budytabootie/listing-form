@@ -1107,3 +1107,22 @@ body {
   border-radius: 5px !important;
   margin-top: 10px !important;
 }
+
+/* Menghilangkan panah atas/bawah bawaan browser */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield; /* Untuk Firefox */
+}
+
+/* Sembunyikan body saat loading access */
+body {
+  display: none;
+}
+body.access-granted {
+  display: block;
+}

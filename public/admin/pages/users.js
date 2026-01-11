@@ -1,3 +1,4 @@
+// public/js/admin/users.js
 export const UsersPage = {
   state: {
     searchQuery: "",
@@ -51,13 +52,13 @@ export const UsersPage = {
          </div>
     </div>
 
-    <div style="background: #2f3136; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-        <table style="width: 100%; border-collapse: collapse; font-size:0.9rem;">
+    <div style="background: #2f3136; border-radius: 12px; overflow-x: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+        <table style="width: 100%; min-width: 800px; border-collapse: collapse; font-size:0.9rem;">
             <thead>
                 <tr style="background: #202225; text-align: left; color:#b9bbbe;">
                     <th style="padding: 18px;">NAMA LENGKAP</th>
                     <th style="padding: 18px;">USERNAME</th>
-                    <th style="padding: 18px;">STATUS PASSWORD</th>
+                    <th style="padding: 18px;">KEAMANAN</th>
                     <th style="padding: 18px;">ROLE</th>
                     <th style="padding: 18px; text-align: center;">AKSI</th>
                 </tr>
@@ -65,26 +66,11 @@ export const UsersPage = {
             <tbody id="userTableBody"></tbody>
         </table>
     </div>
-
     <div id="userPagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 25px;"></div>
   `,
 
   init: async (supabase, userData) => {
-    if (!supabase) {
-      console.error("Supabase instance not found!");
-      return;
-    }
-
     const st = UsersPage.state;
-
-    const fetchConfig = async () => {
-      try {
-        const res = await fetch("/api/get-config");
-        st.config = await res.json();
-      } catch (e) {
-        console.error("Gagal mengambil config:", e);
-      }
-    };
 
     const generatePass = () => {
       const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -94,29 +80,228 @@ export const UsersPage = {
       return res;
     };
 
-    const sendDiscordNotification = async (
-      discordId,
-      nama,
-      username,
-      password,
-      type = "create"
-    ) => {
-      if (!discordId || !st.config) return;
-      const title =
-        type === "create" ? "🆕 AKUN AKSES BARU" : "🔐 PASSWORD DIRESET";
-      const message = `**${title}**\n\nHalo **${nama}**, berikut adalah detail akses Portal Anda:\n\n👤 Username: \`${username}\` \n🔑 Password: \`${password}\`\n\n_Harap simpan data ini dengan aman!_`;
+    const fetchConfig = async () => {
       try {
-        await fetch(`${st.config.supabaseUrl}/functions/v1/discord-notifier`, {
+        const res = await fetch("/api/get-config");
+        st.config = await res.json();
+      } catch (e) {
+        console.error("Gagal load config:", e);
+      }
+    };
+
+    const callAdminAction = async (action, payload) => {
+      try {
+        if (!st.config) await fetchConfig();
+        const baseUrl = st.config.supabaseUrl.replace(/\/$/, "");
+        const token = localStorage.getItem("sessionToken");
+        if (!token) throw new Error("Sesi habis, silakan login kembali.");
+
+        const cleanPayload = {
+          ...payload,
+          admin_name: userData?.nama_lengkap || "Admin",
+        };
+
+        const response = await fetch(`${baseUrl}/functions/v1/admin-actions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${st.config.supabaseKey}`,
+            "x-session-token": token,
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ discord_id: discordId, message: message }),
+          body: JSON.stringify({ action, payload: cleanPayload }),
         });
-      } catch (err) {
-        console.error("Discord Notify Error:", err);
+
+        const res = await response.json();
+        if (!response.ok) throw new Error(res.error || "Gagal memproses aksi");
+        return { success: true };
+      } catch (e) {
+        Swal.fire("Error", e.message, "error");
+        return { success: false };
       }
+    };
+
+    const showEditModal = async (user) => {
+      await Swal.fire({
+        title: "Edit User Access",
+        background: "#2f3136",
+        color: "#fff",
+        html: `
+          <div style="text-align:left;">
+            <label style="font-size:0.8rem; color:#b9bbbe;">ROLE AKSES</label>
+            <select id="editRole" class="swal2-input" style="background:#202225; color:white; border:1px solid #4f545c; width:100%; margin:10px 0;">
+              ${st.rolesList
+                .map(
+                  (r) =>
+                    `<option value="${r.id}" ${
+                      r.id === user.role_id ? "selected" : ""
+                    }>${r.role_name}</option>`
+                )
+                .join("")}
+            </select>
+            <hr style="border:0; border-top:1px solid #4f545c; margin:20px 0;">
+            <button id="btnResetPass" class="swal2-confirm swal2-styled" style="background:#faa61a; width:100%; margin:0;">RESET & DM PASSWORD BARU</button>
+          </div>
+        `,
+        showConfirmButton: true,
+        confirmButtonText: "SIMPAN ROLE",
+        didOpen: () => {
+          document.getElementById("btnResetPass").onclick = async () => {
+            const newPass = generatePass();
+            const member = st.membersList.find(
+              (m) => m.nama === user.nama_lengkap
+            );
+
+            Swal.showLoading();
+            const res = await callAdminAction("reset_password", {
+              user_id: user.id,
+              nama_lengkap: user.nama_lengkap,
+              username: user.username,
+              password: newPass, // KIRIM POLOS KE EDGE
+              discord_id: member?.discord_id,
+              app_url: window.location.origin,
+            });
+
+            if (res.success) {
+              Swal.fire(
+                "Berhasil",
+                "Password direset & dikirim ke Discord.",
+                "success"
+              );
+              loadUsers();
+            }
+          };
+        },
+        preConfirm: async () => {
+          const newRoleId = document.getElementById("editRole").value;
+          const { error } = await supabase
+            .from("users_login")
+            .update({ role_id: parseInt(newRoleId) })
+            .eq("id", user.id);
+          if (error) Swal.fire("Error", "Gagal update role", "error");
+          loadUsers();
+        },
+      });
+    };
+
+    const renderTable = (items) => {
+      const tableBody = document.getElementById("userTableBody");
+      if (!tableBody) return;
+      tableBody.innerHTML = items
+        .map(
+          (user) => `
+        <tr style="border-bottom: 1px solid #36393f;">
+            <td style="padding: 15px; color:#fff;">${user.nama_lengkap}</td>
+            <td style="padding: 15px;"><code style="color:#faa61a;">@${
+              user.username
+            }</code></td>
+            <td style="padding: 15px;">
+                ${
+                  user.has_changed_password
+                    ? '<span style="color:#43b581;"><i class="fas fa-check-circle"></i> Secure</span>'
+                    : '<span style="color:#faa61a;"><i class="fas fa-key"></i> Default</span>'
+                }
+            </td>
+            <td style="padding: 15px;">
+                <span style="color:${getRoleColor(
+                  user.role_id
+                )}; font-size:0.7rem; font-weight:bold; background:rgba(0,0,0,0.2); padding:4px 8px; border-radius:4px;">
+                ${user.roles?.role_name || "Unknown"}</span>
+            </td>
+            <td style="padding: 15px; text-align: center; display: flex; gap: 8px; justify-content: center;">
+                <button class="btn-edit-user" data-id="${
+                  user.id
+                }" style="background:#5865F2; color:white; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-edit"></i> EDIT</button>
+                <button class="btn-delete-user" data-id="${
+                  user.id
+                }" style="background:#ed4245; padding:5px 10px; border:none; color:white; border-radius:4px; cursor:pointer;"><i class="fas fa-trash-alt"></i></button>
+            </td>
+        </tr>`
+        )
+        .join("");
+
+      tableBody.querySelectorAll(".btn-edit-user").forEach((btn) => {
+        btn.onclick = () => {
+          const user = items.find((u) => u.id == btn.dataset.id);
+          if (user) showEditModal(user);
+        };
+      });
+
+      tableBody.querySelectorAll(".btn-delete-user").forEach((btn) => {
+        btn.onclick = async () => {
+          const user = items.find((u) => u.id == btn.dataset.id);
+          const res = await Swal.fire({
+            title: "Hapus Akses?",
+            text: `Akun ${user.nama_lengkap} akan dihapus permanen.`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#ed4245",
+            background: "#2f3136",
+            color: "#fff",
+          });
+
+          if (res.isConfirmed) {
+            Swal.showLoading();
+            const result = await callAdminAction("delete_user", {
+              user_id: user.id,
+              nama_lengkap: user.nama_lengkap,
+              username: user.username,
+            });
+            if (result.success) {
+              Swal.fire("Dihapus", "Akses user telah dicabut.", "success");
+              loadUsers();
+            }
+          }
+        };
+      });
+    };
+
+    const loadUsers = async () => {
+      const { data, error } = await supabase
+        .from("users_login")
+        .select(`*, roles(role_name)`)
+        .order("nama_lengkap");
+      if (error) return;
+      const filtered = data.filter(
+        (u) =>
+          u.nama_lengkap.toLowerCase().includes(st.searchQuery.toLowerCase()) ||
+          u.username.toLowerCase().includes(st.searchQuery.toLowerCase())
+      );
+      const totalPages = Math.ceil(filtered.length / st.itemsPerPage) || 1;
+      const paginated = filtered.slice(
+        (st.currentPage - 1) * st.itemsPerPage,
+        st.currentPage * st.itemsPerPage
+      );
+      renderTable(paginated);
+      renderPagination(totalPages);
+    };
+
+    const getRoleColor = (id) =>
+      ({ 1: "#ed4245", 2: "#faa61a", 3: "#5865F2", 5: "#43b581" }[id] ||
+      "#b9bbbe");
+
+    const renderPagination = (totalPages) => {
+      const container = document.getElementById("userPagination");
+      if (!container || totalPages <= 1)
+        return container ? (container.innerHTML = "") : null;
+      container.innerHTML =
+        `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px;">` +
+        Array.from(
+          { length: totalPages },
+          (_, i) =>
+            `<button class="pg-nav" data-page="${
+              i + 1
+            }" style="border:none; color:white; padding:5px 10px; margin:2px; border-radius:4px; cursor:pointer; background:${
+              i + 1 === st.currentPage ? "#faa61a" : "#4f545c"
+            }">${i + 1}</button>`
+        ).join("") +
+        `</div>`;
+      container.querySelectorAll(".pg-nav").forEach(
+        (btn) =>
+          (btn.onclick = () => {
+            st.currentPage = parseInt(btn.dataset.page);
+            loadUsers();
+          })
+      );
     };
 
     const loadInitialData = async () => {
@@ -142,222 +327,6 @@ export const UsersPage = {
           .join("");
     };
 
-    const loadUsers = async () => {
-      const { data, error } = await supabase
-        .from("users_login")
-        .select(`*, roles(role_name)`)
-        .order("nama_lengkap");
-      if (error) return;
-      const filtered = data.filter(
-        (u) =>
-          u.nama_lengkap.toLowerCase().includes(st.searchQuery.toLowerCase()) ||
-          u.username.toLowerCase().includes(st.searchQuery.toLowerCase())
-      );
-      const totalPages = Math.ceil(filtered.length / st.itemsPerPage) || 1;
-      const paginated = filtered.slice(
-        (st.currentPage - 1) * st.itemsPerPage,
-        st.currentPage * st.itemsPerPage
-      );
-      renderTable(paginated);
-      renderPagination(totalPages);
-    };
-
-    const renderTable = (items) => {
-      const tableBody = document.getElementById("userTableBody");
-      tableBody.innerHTML = items
-        .map(
-          (user) => `
-        <tr style="border-bottom: 1px solid #36393f;">
-            <td style="padding: 15px; color:#fff;">${user.nama_lengkap}</td>
-            <td style="padding: 15px;"><code style="color:#faa61a;">@${
-              user.username
-            }</code></td>
-            <td style="padding: 15px;">
-                ${
-                  user.is_encrypted
-                    ? '<span style="color:#43b581; font-size:0.8rem;"><i class="fas fa-shield-alt"></i> Encrypted</span>'
-                    : `<span style="color:#fff; background:#4f545c; padding:2px 8px; border-radius:4px;">${user.password}</span>`
-                }
-            </td>
-            <td style="padding: 15px;">
-                <span style="color:${getRoleColor(
-                  user.role_id
-                )}; font-size:0.7rem; font-weight:bold; background:rgba(0,0,0,0.2); padding:4px 8px; border-radius:4px;">${
-            user.roles?.role_name || "Unknown"
-          }</span>
-            </td>
-            <td style="padding: 15px; text-align: center; display: flex; gap: 8px; justify-content: center;">
-                <button class="btn-edit-user" data-user='${JSON.stringify(
-                  user
-                )}' style="background:#faa61a; padding:5px 10px; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-edit"></i></button>
-                <button class="btn-delete-user" data-id="${
-                  user.id
-                }" data-name="${
-            user.nama_lengkap
-          }" style="background:#ed4245; padding:5px 10px; border:none; color:white; border-radius:4px; cursor:pointer;"><i class="fas fa-trash-alt"></i></button>
-            </td>
-        </tr>`
-        )
-        .join("");
-
-      tableBody
-        .querySelectorAll(".btn-edit-user")
-        .forEach(
-          (btn) =>
-            (btn.onclick = () => showEditModal(JSON.parse(btn.dataset.user)))
-        );
-      tableBody.querySelectorAll(".btn-delete-user").forEach(
-        (btn) =>
-          (btn.onclick = async () => {
-            const result = await Swal.fire({
-              title: "Hapus Akses?",
-              text: `Akun untuk ${btn.dataset.name} akan dihapus selamanya.`,
-              icon: "warning",
-              showCancelButton: true,
-              confirmButtonColor: "#ed4245",
-              background: "#2f3136",
-              color: "#fff",
-            });
-            if (result.isConfirmed) {
-              await supabase
-                .from("users_login")
-                .delete()
-                .eq("id", btn.dataset.id);
-              loadUsers();
-            }
-          })
-      );
-    };
-
-    const showEditModal = async (user) => {
-      const { value: formValues } = await Swal.fire({
-        title: `<div style="display:flex; flex-direction:column; align-items:center; gap:5px;"><div style="background:rgba(250,166,26,0.1); padding:12px; border-radius:12px; margin-bottom:5px;"><i class="fas fa-shield-alt" style="color:#faa61a; font-size:1.2rem;"></i></div><span style="color:white; font-size:1.1rem; font-weight:bold;">Update User Access</span></div>`,
-        background: "#2f3136",
-        padding: "1.5em",
-        html: `
-            <div style="text-align:left; font-family: 'Inter', sans-serif;">
-              <div style="margin-bottom:18px;">
-                <label style="font-size:0.65rem; color:#8e9297; font-weight:800; text-transform:uppercase; display:block; margin-bottom:8px;">Account Owner</label>
-                <div style="width:100%; background:#202225; color:#72767d; border-radius:8px; padding:12px; font-weight:600; display:flex; align-items:center; border: 1px solid #202225;"><i class="fas fa-user-lock" style="font-size:0.9rem; margin-right:12px; opacity:0.5;"></i> ${
-                  user.nama_lengkap
-                }</div>
-              </div>
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:18px;">
-                <div>
-                    <label style="font-size:0.65rem; color:#8e9297; font-weight:800; text-transform:uppercase; display:block; margin-bottom:8px;">Username</label>
-                    <input id="swal-username" value="${
-                      user.username
-                    }" style="width:100%; background:#202225; color:white; border:1px solid #202225; border-radius:8px; padding:10px 12px; font-size:0.9rem; outline:none;">
-                </div>
-                <div>
-                    <label style="font-size:0.65rem; color:#8e9297; font-weight:800; text-transform:uppercase; display:block; margin-bottom:8px;">Access Level</label>
-                    <select id="swal-role" style="width:100%; background:#202225; color:white; border:1px solid #202225; border-radius:8px; padding:10px 12px; font-size:0.9rem;">
-                      ${st.rolesList
-                        .map(
-                          (r) =>
-                            `<option value="${r.id}" ${
-                              r.id === user.role_id ? "selected" : ""
-                            }>${r.role_name}</option>`
-                        )
-                        .join("")}
-                    </select>
-                </div>
-              </div>
-              <div style="margin-top:25px; padding-top:20px; border-top: 1px solid #4f545c;">
-                <label style="font-size:0.65rem; color:#faa61a; font-weight:800; text-transform:uppercase; display:block; margin-bottom:8px;">Security Reset</label>
-                <div style="position:relative; display:flex; align-items:center;">
-                    <input id="swal-new-pass" placeholder="Leave blank to keep current" readonly style="width:100%; background:#202225; color:#faa61a; border:1px solid #4f545c; border-radius:8px; padding:12px 45px 12px 12px; font-family:monospace; font-weight:bold; font-size:1rem;">
-                    <button type="button" id="btn-gen-edit" style="position:absolute; right:10px; background:#36393f; border:none; color:#b9bbbe; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fas fa-sync-alt"></i></button>
-                </div>
-              </div>
-            </div>`,
-        showCancelButton: true,
-        confirmButtonText: "Save Changes",
-        confirmButtonColor: "#faa61a",
-        cancelButtonColor: "transparent",
-        didOpen: () => {
-          document.getElementById("btn-gen-edit").onclick = () => {
-            document.getElementById("swal-new-pass").value = generatePass();
-            document.getElementById("btn-gen-edit").style.color = "#faa61a";
-          };
-        },
-        preConfirm: () => ({
-          username: document.getElementById("swal-username").value,
-          role_id: document.getElementById("swal-role").value,
-          new_password: document.getElementById("swal-new-pass").value,
-        }),
-      });
-
-      if (formValues) {
-        const updateData = {
-          username: formValues.username,
-          role_id: parseInt(formValues.role_id),
-        };
-        if (formValues.new_password) {
-          updateData.password = CryptoJS.SHA256(
-            formValues.new_password
-          ).toString();
-          updateData.is_encrypted = true;
-        }
-        const { error } = await supabase
-          .from("users_login")
-          .update(updateData)
-          .eq("id", user.id);
-        if (!error) {
-          if (formValues.new_password) {
-            const member = st.membersList.find(
-              (m) => m.nama === user.nama_lengkap
-            );
-            if (member)
-              sendDiscordNotification(
-                member.discord_id,
-                user.nama_lengkap,
-                formValues.username,
-                formValues.new_password,
-                "reset"
-              );
-          }
-          Swal.fire({
-            title: "Updated!",
-            icon: "success",
-            background: "#2f3136",
-            color: "#fff",
-            timer: 1500,
-            showConfirmButton: false,
-          });
-          loadUsers();
-        }
-      }
-    };
-
-    const getRoleColor = (id) =>
-      ({ 1: "#ed4245", 2: "#faa61a", 3: "#5865F2", 5: "#43b581" }[id] ||
-      "#b9bbbe");
-
-    const renderPagination = (totalPages) => {
-      const container = document.getElementById("userPagination");
-      if (totalPages <= 1) return (container.innerHTML = "");
-      container.innerHTML =
-        `<div style="display:flex; background:#23272a; padding:5px; border-radius:8px;">` +
-        Array.from(
-          { length: totalPages },
-          (_, i) =>
-            `<button class="pg-nav" data-page="${
-              i + 1
-            }" style="border:none; color:white; padding:5px 10px; margin:2px; border-radius:4px; cursor:pointer; background:${
-              i + 1 === st.currentPage ? "#faa61a" : "#4f545c"
-            }">${i + 1}</button>`
-        ).join("") +
-        `</div>`;
-      container.querySelectorAll(".pg-nav").forEach(
-        (btn) =>
-          (btn.onclick = () => {
-            st.currentPage = parseInt(btn.dataset.page);
-            loadUsers();
-          })
-      );
-    };
-
     document.getElementById("userSearch").oninput = (e) => {
       st.searchQuery = e.target.value;
       st.currentPage = 1;
@@ -369,32 +338,23 @@ export const UsersPage = {
       const username = document.getElementById("addUsername").value;
       const passwordPlain = document.getElementById("addPassword").value;
       const role_id = document.getElementById("addRole").value;
+
       if (!nama_lengkap || !username || !role_id)
         return Swal.fire("Error", "Isi semua data!", "error");
-      const { error } = await supabase
-        .from("users_login")
-        .insert([
-          {
-            nama_lengkap,
-            username,
-            password: CryptoJS.SHA256(passwordPlain).toString(),
-            role_id: parseInt(role_id),
-            is_encrypted: true,
-            role: "admin",
-          },
-        ]);
-      if (error) {
-        Swal.fire("Gagal", "Username sudah ada!", "error");
-      } else {
-        const member = st.membersList.find((m) => m.nama === nama_lengkap);
-        if (member)
-          sendDiscordNotification(
-            member.discord_id,
-            nama_lengkap,
-            username,
-            passwordPlain,
-            "create"
-          );
+
+      Swal.showLoading();
+      const member = st.membersList.find((m) => m.nama === nama_lengkap);
+
+      const res = await callAdminAction("create_user", {
+        nama_lengkap,
+        username,
+        role_id: parseInt(role_id),
+        password: passwordPlain, // KIRIM POLOS KE EDGE
+        discord_id: member?.discord_id,
+        app_url: window.location.origin,
+      });
+
+      if (res.success) {
         Swal.fire({
           title: "Berhasil",
           icon: "success",

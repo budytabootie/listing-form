@@ -1,4 +1,5 @@
 import { GlobalCart } from "./globalCart.js";
+import { API } from "../js/core/api.js";
 
 export const AttachmentPage = {
   state: { items: [] },
@@ -8,6 +9,10 @@ export const AttachmentPage = {
       ? `$ ${Number(item.harga_satuan).toLocaleString()}`
       : "$ 0";
     const cannotBuy = isOut || isNotReady;
+
+    // Ambil info senjata dari kolom deskripsi
+    const compatibility =
+      item.deskripsi || "Aksesoris peningkatan performa senjata.";
 
     return `
       <div class="item-card" style="background: #2f3136; border-radius: 12px; padding: 20px; border: 1px solid #40444b; display: flex; flex-direction: column; transition: transform 0.2s; ${
@@ -36,7 +41,11 @@ export const AttachmentPage = {
               <h3 style="color: #fff; margin: 0 0 8px 0; font-size: 1.1rem; letter-spacing: 0.5px;">${
                 item.nama_barang
               }</h3>
-              <p style="color: #b9bbbe; font-size: 0.8rem; line-height: 1.5; margin-bottom: 20px;">Scope, Grip, atau Muzzle untuk performa maksimal.</p>
+              
+              <div style="background: rgba(88, 101, 242, 0.05); padding: 10px; border-radius: 8px; border-left: 3px solid #5865f2; margin-bottom: 20px;">
+                <p style="color: #8e9297; font-size: 0.65rem; text-transform: uppercase; font-weight: 800; margin: 0 0 4px 0; letter-spacing: 0.5px;">Cocok Untuk:</p>
+                <p style="color: #b9bbbe; font-size: 0.8rem; line-height: 1.4; margin: 0;">${compatibility}</p>
+              </div>
           </div>
           <button onclick="${
             cannotBuy
@@ -75,9 +84,9 @@ export const AttachmentPage = {
             <div class="input-group-modern">
                 <label>Jumlah Unit</label>
                 <div class="qty-wrapper-modern" style="border-color: #4f545c;">
-                    <button class="qty-ctrl" onclick="this.nextElementSibling.stepDown()">-</button>
+                    <button class="qty-ctrl" onclick="this.nextElementSibling.stepDown(); event.stopPropagation();">-</button>
                     <input type="number" id="attachQty" value="1" min="1" max="${availableStock}">
-                    <button class="qty-ctrl" onclick="this.previousElementSibling.stepUp()">+</button>
+                    <button class="qty-ctrl" onclick="this.previousElementSibling.stepUp(); event.stopPropagation();">+</button>
                 </div>
             </div>
             <div class="status-container">
@@ -103,33 +112,33 @@ export const AttachmentPage = {
             <div class="catalog-grid" id="attachmentList">
                 <div style="color: #72767d; text-align: center; padding: 50px; grid-column: 1/-1;">
                     <i class="fas fa-circle-notch fa-spin" style="font-size:2rem; margin-bottom:10px;"></i>
-                    <p>Mengambil data attachment...</p>
+                    <p>Sinkronisasi modul attachment...</p>
                 </div>
             </div>
         </div>
     </div>
   `,
 
-  init: async (supabase) => {
+  init: async () => {
     const container = document.getElementById("attachmentList");
     if (!container) return;
 
     const loadAttachments = async () => {
-      const { data: katalog } = await supabase
-        .from("katalog_barang")
-        .select("*")
-        .eq("jenis_barang", "Attachment");
-      const { data: inventory } = await supabase
-        .from("inventory")
-        .select("item_name, stock");
+      try {
+        // MENGGUNAKAN API WRAPPER
+        const { data: katalog } = await API.getItemsByCategory("Attachment");
+        const { data: inventory } = await API.getInventory();
 
-      AttachmentPage.state.items = (katalog || []).map((a) => ({
-        ...a,
-        stok:
-          (inventory?.find((i) => i.item_name === a.nama_barang)?.stock || 0) -
-          GlobalCart.getQtyInCart(a.nama_barang),
-      }));
-      renderAttachments();
+        AttachmentPage.state.items = (katalog || []).map((a) => ({
+          ...a,
+          stok:
+            (inventory?.find((i) => i.item_name === a.nama_barang)?.stock ||
+              0) - GlobalCart.getQtyInCart(a.nama_barang),
+        }));
+        renderAttachments();
+      } catch (err) {
+        console.error("Load Attachments Error:", err);
+      }
     };
 
     const renderAttachments = () => {

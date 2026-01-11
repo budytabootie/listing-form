@@ -1,4 +1,3 @@
-// globalCart.js
 export const GlobalCart = {
   items: [],
 
@@ -8,15 +7,14 @@ export const GlobalCart = {
   },
 
   addToCart: function (item, maxStock) {
-    // FORCE: Pastikan harga yang masuk adalah tipe data Number
     item.harga = Number(item.harga) || 0;
-
     const currentInCart = this.getQtyInCart(item.nama);
+
     if (currentInCart + item.qty > maxStock) {
       Swal.fire({
         icon: "error",
         title: "Stok Terbatas",
-        text: `Gudang hanya sisa ${maxStock}. Kamu sudah punya ${currentInCart} di keranjang.`,
+        text: `Gudang hanya sisa ${maxStock}. Di keranjang sudah ada ${currentInCart}.`,
         background: "#2f3136",
         color: "#fff",
       });

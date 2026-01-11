@@ -32,24 +32,24 @@ export const HomePage = {
             <div class="cat-card" onclick="loadPage('vest')">
                 <div class="cat-icon" style="color: #5865F2;"><i class="fas fa-shield-alt"></i></div>
                 <div class="cat-info">
-                    <h3>VEST</h3>
-                    <p>Perlindungan ekstra</p>
+                    <h3>BAJU ANGET</h3>
+                    <p>Buat kekebalan tubuh katanya</p>
                 </div>
             </div>
 
             <div class="cat-card" onclick="loadPage('ammo')">
                 <div class="cat-icon" style="color: #faa61a;"><i class="fas fa-box-open"></i></div>
                 <div class="cat-info">
-                    <h3>AMMO</h3>
-                    <p>Persediaan amunisi</p>
+                    <h3>PELOR</h3>
+                    <p>Kata orang mah ini buat isian mainan</p>
                 </div>
             </div>
 
             <div class="cat-card" onclick="loadPage('weapon')">
                 <div class="cat-icon" style="color: #f04747;"><i class="fas fa-gun"></i></div>
                 <div class="cat-info">
-                    <h3>WEAPON</h3>
-                    <p>Persenjataan api & tajam</p>
+                    <h3>PIW PIW</h3>
+                    <p>Mainan aja mainan</p>
                 </div>
             </div>
 

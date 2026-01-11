@@ -6,3 +6,9 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
     "discord_id": "570875316722073601",
     "message": "Tes dari VS Code REST Client: Bot Discord OK!"
 }
+
+###
+
+curl -X POST https://djvihsohbbpwzpfjahow.supabase.co/functions/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "rudytabootie", "password": "In1P4ssw0rdnya#2199"}'
