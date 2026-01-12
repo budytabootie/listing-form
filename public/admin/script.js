@@ -73,6 +73,15 @@ async function init() {
   };
   // ----------------------------------------
 
+  if (!sessionStorage.getItem("login_logged")) {
+    window.createAuditLog(
+      "LOGIN",
+      "users_login",
+      `Admin ${user.nama_lengkap} masuk ke dashboard`
+    );
+    sessionStorage.setItem("login_logged", "true");
+  }
+
   // 1. Sinkronkan Global Helper
   window.loadPage = (page) => Navigation.loadPage(page);
 
