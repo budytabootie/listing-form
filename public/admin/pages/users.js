@@ -185,24 +185,26 @@ export const UsersPage = {
         },
         preConfirm: async () => {
           const newRoleId = document.getElementById("editRole").value;
-          const newRoleName =
-            document.getElementById("editRole").options[
-              document.getElementById("editRole").selectedIndex
-            ].text;
 
+          // 1. Update Role di tabel users_login
           const { error } = await supabase
             .from("users_login")
             .update({ role_id: parseInt(newRoleId) })
             .eq("id", targetUser.id);
 
-          if (error) {
-            Swal.fire("Error", "Gagal update role: " + error.message, "error");
-          } else {
+          if (!error) {
+            // 2. Hapus semua session user tersebut agar dia "Logout Paksa"
+            // Ini memastikan Rudy tidak bisa pakai token lamanya lagi.
+            await supabase
+              .from("user_sessions")
+              .delete()
+              .eq("user_id", targetUser.id);
+
             if (window.createAuditLog) {
               await window.createAuditLog(
                 "UPDATE",
                 "users_login",
-                `Mengubah role @${targetUser.username} menjadi ${newRoleName}`
+                `Mengubah role @${targetUser.username} dan reset session.`
               );
             }
             loadUsers();

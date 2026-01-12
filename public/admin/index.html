@@ -17,7 +17,10 @@
 
     <script type="module">
         import { runAuthGuard } from "../js/core/auth-guard.js";
-        runAuthGuard("../"); // Base path naik satu folder
+        // Tambahkan delay kecil untuk memastikan state login stabil
+        setTimeout(() => {
+            runAuthGuard("../");
+        }, 100);
     </script>
 </head>
 

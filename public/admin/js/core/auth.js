@@ -34,23 +34,35 @@ export const Auth = {
       .from("user_sessions")
       .select(
         `
-                *,
-                users_login (
-                    *,
-                    roles (*)
-                )
-            `
+      *,
+      users_login (
+          *,
+          roles (*)
+      )
+  `
       )
       .eq("token", token)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
 
     // Jika error atau data tidak ditemukan, tendang ke login
-    if (error || !data?.users_login) {
+    if (data && data.users_login) {
       console.error("Session Invalid:", error);
-      localStorage.removeItem("sessionToken");
-      window.location.href = "../login.html";
-      return null;
+      // Ambil data user dari session yang tersimpan di memori browser (jika ada)
+      const cachedUser = JSON.parse(
+        localStorage.getItem("nmc_user_data") || "{}"
+      );
+      if (
+        cachedUser.role_id &&
+        data.users_login.role_id !== cachedUser.role_id
+      ) {
+        console.warn("Role changed detected! Re-logging...");
+        localStorage.removeItem("sessionToken");
+        localStorage.removeItem("nmc_user_data");
+        window.location.href = "../login.html?reason=role_changed";
+        return null;
+      }
+      localStorage.setItem("nmc_user_data", JSON.stringify(data.users_login));
     }
 
     // --- PERBAIKAN DI SINI ---

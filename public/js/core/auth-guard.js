@@ -19,14 +19,32 @@ export async function runAuthGuard(basePath = "") {
     }
 
     // 2. Ambil Config
-    const configPath = `${basePath}api/get-config.js`;
-    const configResp = await fetch(configPath);
-    if (!configResp.ok)
-      throw new Error(`Gagal fetch config: ${configResp.statusText}`);
-    const configData = await configResp.json();
+    const configPath = `${basePath}api/get-config`;
+    let configData;
+
+    try {
+      const configResp = await fetch(configPath, {
+        method: "GET",
+        headers: { "Cache-Control": "no-cache" },
+      });
+
+      if (!configResp.ok)
+        throw new Error(`Server Config Error: ${configResp.status}`);
+      configData = await configResp.json();
+    } catch (fetchErr) {
+      console.error("Gagal mengambil config:", fetchErr);
+      // Jika gagal, coba reload sekali lagi setelah 1 detik
+      setTimeout(() => window.location.reload(), 1000);
+      return;
+    }
 
     // 3. Inisialisasi Supabase dengan Header Custom (x-custom-token)
-    // 3. Inisialisasi Supabase
+    // Pastikan window.supabase sudah benar-benar siap
+    if (typeof window.supabase === "undefined") {
+      console.error("Supabase library not ready");
+      return;
+    }
+
     const supabase = window.supabase.createClient(
       configData.supabaseUrl,
       configData.supabaseKey,
@@ -45,7 +63,14 @@ export async function runAuthGuard(basePath = "") {
 
     // 5. Verifikasi ke Database
     console.log("Verifying session with DB...");
-    const sessionResult = await API.fetchSessionWithUser(token);
+    if (!token || token === "null") {
+      window.location.href = `${basePath}login.html`;
+      return;
+    }
+
+    const sessionResult = await API.fetchSessionWithUser(token).catch((err) => {
+      return { data: null, error: err };
+    });
 
     if (!sessionResult) return;
     const { data, error } = sessionResult;

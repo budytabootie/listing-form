@@ -33,7 +33,12 @@ serve(async (req) => {
 
     const { data: sessionData, error: authError } = await supabase
       .from("user_sessions")
-      .select(`user_id, users_login:user_id (role_id)`)
+      .select(`
+        user_id,
+        users_login!user_id (
+          role_id
+        )
+      `)
       .eq("token", token)
       .single();
 
