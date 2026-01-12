@@ -4,13 +4,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-custom-auth", // Tambahkan x-custom-auth di sini
+    "authorization, x-client-info, apikey, content-type, x-custom-auth, x-session-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Fungsi helper untuk hash SHA256 di sisi server
 async function hashPassword(password: string) {
-  const msgUint8 = new TextEncoder().encode(password);
+  // Memastikan password bersih dari spasi sebelum di-hash
+  const msgUint8 = new TextEncoder().encode(password.trim());
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -42,28 +42,23 @@ serve(async (req) => {
     const { action, payload } = await req.json();
     const userRole = sessionData.users_login?.role_id;
 
-    // Proteksi Admin (Role 1 & 2)
+    // Kecuali ganti password sendiri, harus admin (1 atau 2)
     if (
       action !== "self_change_password" && (userRole !== 1 && userRole !== 2)
     ) {
-      throw new Error("Unauthorized: Anda bukan Admin!");
+      throw new Error("Unauthorized");
     }
 
     let dbError;
-    const plain_p = (payload.password || "").toString();
-    const origin = req.headers.get("referer")
-      ? new URL(req.headers.get("referer")).origin
-      : "https://portal.anda";
-    const portalUrl = payload.app_url || origin;
+    // PENTING: Trim password di sini
+    const plain_p = (payload.password || "").toString().trim();
 
     if (
       action === "create_user" || action === "reset_password" ||
       action === "self_change_password"
     ) {
-      // HASHING DILAKUKAN DI SINI SEBELUM MASUK DB
-      console.log("DEBUG - Password masuk ke Edge:", plain_p);
-
-      const hashed_p = await hashPassword(plain_p.trim());
+      if (!plain_p) throw new Error("Password tidak boleh kosong");
+      const hashed_p = await hashPassword(plain_p);
 
       if (action === "create_user") {
         const { error } = await supabase.from("users_login").insert([{
@@ -78,14 +73,15 @@ serve(async (req) => {
       } else if (action === "reset_password") {
         const { error } = await supabase.from("users_login").update({
           password: hashed_p,
+          is_encrypted: true,
           has_changed_password: false,
         }).eq("id", payload.user_id);
         dbError = error;
       } else if (action === "self_change_password") {
         const { error } = await supabase.from("users_login").update({
           password: hashed_p,
-          has_changed_password: true,
           is_encrypted: true,
+          has_changed_password: true,
         }).eq("id", payload.user_id);
         dbError = error;
       }
@@ -99,18 +95,22 @@ serve(async (req) => {
 
     if (dbError) throw dbError;
 
-    // --- NOTIFIKASI DISCORD (PAKAI PASSWORD POLOS) ---
+    // Notifikasi Discord untuk Admin Action
     if (
       (action === "create_user" || action === "reset_password") &&
       payload.discord_id
     ) {
-      try {
-        const messageContent = action === "create_user"
-          ? `🆕 **AKUN PORTAL BARU**\n\n👤 Username: \`${payload.username}\`\n🔑 Password: \`${plain_p}\`\n🌐 Link: ${portalUrl}\n\n⚠️ *Wajib ganti password saat login pertama!*`
-          : `🔄 **RESET PASSWORD PORTAL**\n\n👤 Username: \`${payload.username}\`\n🔑 Password Baru: \`${plain_p}\`\n🌐 Link: ${portalUrl}\n\n⚠️ *Segera login dan ganti kembali password Anda.*`;
+      const origin = req.headers.get("referer")
+        ? new URL(req.headers.get("referer")).origin
+        : "";
+      const portalUrl = payload.app_url || origin;
+      const messageContent = action === "create_user"
+        ? `🆕 **AKUN PORTAL BARU**\n\n👤 Username: \`${payload.username}\`\n🔑 Password: \`${plain_p}\`\n🌐 Link: ${portalUrl}`
+        : `🔄 **RESET PASSWORD**\n\n👤 Username: \`${payload.username}\`\n🔑 Password Baru: \`${plain_p}\``;
 
-        const baseUrl = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
-        await fetch(`${baseUrl}/functions/v1/discord-notifier`, {
+      await fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/discord-notifier`,
+        {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -122,10 +122,8 @@ serve(async (req) => {
             discord_id: payload.discord_id,
             message: messageContent,
           }),
-        });
-      } catch (e) {
-        console.error("Discord Notif Error:", e.message);
-      }
+        },
+      ).catch((e) => console.error(e));
     }
 
     return new Response(JSON.stringify({ success: true }), {

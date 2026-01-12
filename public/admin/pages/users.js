@@ -139,11 +139,13 @@ export const UsersPage = {
                 .join("")}
             </select>
             <hr style="border:0; border-top:1px solid #4f545c; margin:20px 0;">
-            <button id="btnResetPass" class="swal2-confirm swal2-styled" style="background:#faa61a; width:100%; margin:0;">RESET & DM PASSWORD BARU</button>
+            <button id="btnResetPass" class="swal2-confirm swal2-styled" style="background:#faa61a; width:100%; margin:0; border-radius:4px; font-weight:bold;">RESET & DM PASSWORD BARU</button>
           </div>
         `,
         showConfirmButton: true,
         confirmButtonText: "SIMPAN ROLE",
+        showCancelButton: true,
+        cancelButtonColor: "#4f545c",
         didOpen: () => {
           document.getElementById("btnResetPass").onclick = async () => {
             const newPass = generatePass();
@@ -156,17 +158,20 @@ export const UsersPage = {
               user_id: user.id,
               nama_lengkap: user.nama_lengkap,
               username: user.username,
-              password: newPass, // KIRIM POLOS KE EDGE
+              password: newPass,
               discord_id: member?.discord_id,
               app_url: window.location.origin,
+              is_encrypted: true, // Memberitahu edge untuk set flag enkripsi
             });
 
             if (res.success) {
-              Swal.fire(
-                "Berhasil",
-                "Password direset & dikirim ke Discord.",
-                "success"
-              );
+              Swal.fire({
+                icon: "success",
+                title: "Berhasil",
+                text: "Password direset & dikirim ke Discord.",
+                background: "#2f3136",
+                color: "#fff",
+              });
               loadUsers();
             }
           };

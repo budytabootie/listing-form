@@ -1,32 +1,61 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+// 1. Tambahkan CORS Headers agar bisa dipanggil dari Browser
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-session-token",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-console.log("Hello from Functions!")
-
-Deno.serve(async (req) => {
-  const { name } = await req.json()
-  const data = {
-    message: `Hello ${name}!`,
+serve(async (req) => {
+  // 2. Handle Preflight Request
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
-  return new Response(
-    JSON.stringify(data),
-    { headers: { "Content-Type": "application/json" } },
-  )
-})
+  try {
+    const { items, userId, token } = await req.json();
 
-/* To invoke locally:
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
 
-  1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
-  2. Make an HTTP request:
+    // 3. Validasi Token
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from("user_sessions")
+      .select("user_id")
+      .eq("token", token)
+      .maybeSingle();
 
-  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/process-order' \
-    --header 'Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImI4MTI2OWYxLTIxZDgtNGYyZS1iNzE5LWMyMjQwYTg0MGQ5MCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjIwODM0MTEzMzl9.LJiBPFYsKqCcHWFNE1VMAzkWoN69o4-2mXDeDkxcKQquM0KL3ShS6YCzergXIeED09ji3heqmRdYVFNSFx--5w' \
-    --header 'Content-Type: application/json' \
-    --data '{"name":"Functions"}'
+    if (sessionError || !session) {
+      return new Response(JSON.stringify({ error: "Sesi tidak valid" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-*/
+    // 4. Proses Transaksi
+    for (const item of items) {
+      const { error: rpcError } = await supabaseAdmin.rpc(
+        "decrement_inventory",
+        {
+          i_name: item.nama,
+          i_qty: item.qty,
+        },
+      );
+      if (rpcError) throw rpcError;
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

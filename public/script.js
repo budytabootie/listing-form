@@ -35,7 +35,7 @@ async function init() {
 
   const { supabase, user, token } = session;
 
-  // 2. Registrasi Helper ke Window (Agar bisa dipanggil dari atribut HTML onclick)
+  // 2. Registrasi Helper ke Window
   window._supabase = supabase;
   window._userData = user;
   window.loadPage = (page) => Navigation.loadPage(page);
@@ -44,7 +44,10 @@ async function init() {
 
   // 3. Inisialisasi Modul UI & Navigasi
   Navigation.init(pages, supabase, user);
-  PortalUI.setupPasswordFeatures(supabase, user);
+
+  // PERBAIKAN DI SINI: Hanya kirim 'user', jangan sertakan 'supabase'
+  // agar tidak tertukar di parameter fungsi ui.js
+  PortalUI.setupPasswordFeatures(user);
   PortalUI.setupAdminButton(user);
 
   // 4. Force Change Password Logic
@@ -52,7 +55,7 @@ async function init() {
     return PortalUI.forceChangePassword(user);
   }
 
-  // 5. Update Nama Display ke UI (Desktop & Mobile)
+  // 5. Update Nama Display ke UI
   if (window.syncUserUI) {
     window.syncUserUI(user.nama_lengkap, user.rank || "MEMBER");
   }

@@ -1,166 +1,170 @@
-// public/js/core/ui.js
 import { API } from "./api.js";
+import { Auth } from "./auth.js"; // <--- TAMBAHKAN BARIS INI
 
 export const PortalUI = {
-  /**
-   * Mengatur fitur ganti password (Normal & Force)
-   */
-  /**
-   * Mengatur fitur ganti password (Normal)
-   */
   setupPasswordFeatures(userData) {
     window.changePassword = async () => {
-      const { value: formValues } = await Swal.fire({
+      const { value: newPass } = await Swal.fire({
         title:
-          '<span style="color: #fff; font-size: 1.4rem;">Pengaturan Password</span>',
+          '<i class="fas fa-shield-alt" style="color: #43b581; margin-bottom: 10px;"></i><br><span style="color: #fff; font-size: 1.5rem; font-weight: 600;">Update Keamanan</span>',
         background: "#2f3136",
         html: `
-          <div style="margin-top: 20px; text-align: left;">
-            <div style="margin-bottom: 15px;">
-                <label style="color: #8e9297; font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Password Sekarang</label>
-                <input type="password" id="p-old" class="swal2-input" placeholder="••••••••" style="background:#202225; color:white; border: 1px solid #4f545c; width: 100%; margin: 5px 0; border-radius: 5px;">
+          <div style="margin-top: 15px; padding: 0 10px;">
+            <p style="color: #b9bbbe; font-size: 0.9rem; margin-bottom: 20px;">Silakan masukkan password baru Anda. Pastikan kombinasi sulit ditebak.</p>
+            
+            <div style="position: relative; margin-bottom: 15px;">
+              <i class="fas fa-lock" style="position: absolute; left: 15px; top: 15px; color: #72767d;"></i>
+              <input type="password" id="p-1" class="swal2-input" placeholder="Password Baru" 
+                style="background:#202225; color:white; border: 1px solid #4f545c; width: 100%; border-radius: 8px; padding-left: 45px; margin: 0; box-sizing: border-box; font-size: 0.95rem;">
             </div>
-            <hr style="border: 0; border-top: 1px solid #4f545c; margin: 20px 0;">
-            <div style="margin-bottom: 15px;">
-                <label style="color: #8e9297; font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Password Baru</label>
-                <input type="password" id="p-1" class="swal2-input" placeholder="••••••••" style="background:#202225; color:white; border: 1px solid #4f545c; width: 100%; margin: 5px 0; border-radius: 5px;">
-            </div>
-            <div>
-                <label style="color: #8e9297; font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Ulangi Password Baru</label>
-                <input type="password" id="p-2" class="swal2-input" placeholder="••••••••" style="background:#202225; color:white; border: 1px solid #4f545c; width: 100%; margin: 5px 0; border-radius: 5px;">
+
+            <div style="position: relative;">
+              <i class="fas fa-check-circle" style="position: absolute; left: 15px; top: 15px; color: #72767d;"></i>
+              <input type="password" id="p-2" class="swal2-input" placeholder="Konfirmasi Password" 
+                style="background:#202225; color:white; border: 1px solid #4f545c; width: 100%; border-radius: 8px; padding-left: 45px; margin: 0; box-sizing: border-box; font-size: 0.95rem;">
             </div>
           </div>
         `,
-        confirmButtonText: "UPDATE PASSWORD",
+        confirmButtonText: "SIMPAN PERUBAHAN",
         confirmButtonColor: "#43b581",
         showCancelButton: true,
-        padding: "2em",
+        cancelButtonText: "BATAL",
+        cancelButtonColor: "#f04747",
+        reverseButtons: true,
+        focusConfirm: false,
         preConfirm: () => {
-          const oldP = document.getElementById("p-old").value;
           const p1 = document.getElementById("p-1").value;
           const p2 = document.getElementById("p-2").value;
-
-          if (!oldP)
-            return Swal.showValidationMessage("Password lama wajib diisi!");
           if (!p1 || p1.length < 6)
-            return Swal.showValidationMessage(
-              "Password baru minimal 6 karakter!"
-            );
+            return Swal.showValidationMessage("Minimal 6 karakter!");
           if (p1 !== p2)
             return Swal.showValidationMessage(
-              "Konfirmasi password baru tidak cocok!"
+              "Konfirmasi password tidak cocok!"
             );
-
-          return { oldP, p1 };
+          return p1;
+        },
+        customClass: {
+          popup: "animated fadeInDown fast",
         },
       });
 
-      if (formValues) {
+      if (newPass) {
         Swal.fire({
           title: "Memproses...",
+          background: "#2f3136",
           allowOutsideClick: false,
-          didOpen: () => Swal.showLoading(),
+          didOpen: () => {
+            Swal.showLoading();
+          },
         });
 
-        // Hashing keduanya
-        const oldHashed = CryptoJS.SHA256(formValues.oldP).toString();
-        const newHashed = CryptoJS.SHA256(formValues.p1).toString();
-
-        // Memanggil API dengan 3 parameter sesuai api.js terbaru
-        const result = await API.updatePassword(
-          userData.id,
-          oldHashed,
-          newHashed
-        );
-
+        const result = await API.updatePassword(userData.id, "", newPass);
         if (result.success) {
-          await Swal.fire({
+          Swal.fire({
             icon: "success",
-            title: "Berhasil",
-            text: "Password Anda telah diperbarui.",
+            title: "Berhasil Diperbarui",
+            text: "Data keamanan Anda telah diperbarui.",
             background: "#2f3136",
-            timer: 1500,
+            color: "#fff",
+            timer: 2000,
             showConfirmButton: false,
           });
         } else {
-          Swal.fire(
-            "Gagal",
-            result.message || "Gagal memperbarui password",
-            "error"
-          );
+          Swal.fire({
+            icon: "error",
+            title: "Gagal Update",
+            text: result.message,
+            background: "#2f3136",
+            color: "#fff",
+            confirmButtonColor: "#5865F2",
+          });
         }
       }
     };
   },
 
-  /**
-   * Logika ganti password paksa untuk user baru
-   */
   async forceChangePassword(userData) {
     const { value: newPass } = await Swal.fire({
-      title:
-        '<span style="color: #faa61a; font-weight: bold; letter-spacing: 1px;">VERIFIKASI KEAMANAN</span>',
+      title: `
+        <div style="margin-top: 10px;">
+          <i class="fas fa-user-shield" style="font-size: 3.5rem; color: #faa61a; filter: drop-shadow(0 0 10px rgba(250, 166, 26, 0.3));"></i>
+          <br>
+          <span style="color: #fff; font-size: 1.5rem; font-weight: 800; letter-spacing: 1px; display: block; margin-top: 15px;">
+            VERIFIKASI KEAMANAN
+          </span>
+        </div>
+      `,
       background: "#2f3136",
       html: `
-        <div style="text-align: center; margin-bottom: 20px;">
-          <i class="fas fa-user-lock" style="font-size: 3.5rem; color: #faa61a; margin-bottom: 15px; display: block;"></i>
-          <p style="color: #b9bbbe; font-size: 0.95rem; line-height: 1.5;">Password Anda masih default.<br>Wajib diganti sebelum mengakses portal.</p>
+        <div style="padding: 0 10px;">
+          <p style="color: #b9bbbe; font-size: 0.95rem; line-height: 1.5; margin-bottom: 25px;">
+            Akun Anda terdeteksi menggunakan <strong style="color: #faa61a;">password default</strong>. 
+            Demi keamanan aset digital Anda, wajib membuat password baru sebelum melanjutkan.
+          </p>
+          
+          <div style="position: relative; margin-bottom: 10px;">
+            <i class="fas fa-key" style="position: absolute; left: 15px; top: 15px; color: #faa61a;"></i>
+            <input type="password" id="p-portal-force" class="swal2-input" placeholder="Buat Password Baru" 
+              style="background:#202225; color:white; border: 1px solid #4f545c; width: 100%; border-radius: 8px; padding-left: 45px; margin: 0; box-sizing: border-box; font-size: 1rem; height: 50px;">
+          </div>
+          <p style="color: #72767d; font-size: 0.75rem; text-align: left; margin-top: 8px; margin-left: 5px;">
+            *Minimal 6 karakter, gunakan kombinasi angka dan huruf.
+          </p>
         </div>
-        <input type="password" id="p-portal-force" class="swal2-input" placeholder="Buat Password Baru" 
-          style="background:#202225; color:white; border: 1px solid #4f545c; border-radius: 8px; width: 85%; margin: 0 auto; display: block;">
       `,
       allowOutsideClick: false,
       allowEscapeKey: false,
-      confirmButtonText: "SIMPAN & MASUK",
+      confirmButtonText: "AKTIVASI AKUN SEKARANG",
       confirmButtonColor: "#faa61a",
+      width: "450px",
       padding: "2em",
       preConfirm: () => {
         const v = document.getElementById("p-portal-force").value;
         if (!v || v.length < 6)
-          return Swal.showValidationMessage("Minimal 6 karakter!");
+          return Swal.showValidationMessage(
+            "Password terlalu pendek (Min. 6 karakter)!"
+          );
         return v;
+      },
+      customClass: {
+        confirmButton: "portal-force-confirm-btn",
       },
     });
 
     if (newPass) {
       Swal.fire({
-        title: "Menyimpan...",
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading(),
+        title: "Mengamankan Akun...",
+        background: "#2f3136",
+        didOpen: () => {
+          Swal.showLoading();
+        },
       });
 
-      const hashed = CryptoJS.SHA256(newPass).toString();
-      // Memanggil API yang sudah terhubung ke Edge Function
-      const result = await API.updatePassword(
-        userData.id,
-        userData.password, // Ini password lama (default)
-        hashed // Ini password baru
-      );
+      const result = await API.updatePassword(userData.id, "", newPass);
 
       if (result.success) {
         await Swal.fire({
           icon: "success",
-          title: "Berhasil",
-          text: "Akses diberikan. Mengalihkan...",
+          title: "Akses Diberikan",
+          text: "Password telah diperbarui. Silakan login kembali untuk masuk ke Portal.",
           background: "#2f3136",
           color: "#fff",
-          timer: 1500,
-          showConfirmButton: false,
+          confirmButtonColor: "#43b581",
         });
-        location.reload();
+
+        Auth.logout(localStorage.getItem("sessionToken"));
       } else {
-        Swal.fire(
-          "Gagal",
-          result.message || "Terjadi kesalahan sistem",
-          "error"
-        );
+        Swal.fire({
+          icon: "error",
+          title: "Terjadi Kesalahan",
+          text: result.message,
+          background: "#2f3136",
+          confirmButtonColor: "#f04747",
+        });
       }
     }
   },
 
-  /**
-   * Munculkan tombol admin jika role bukan member biasa
-   */
   setupAdminButton(userData) {
     if (userData.role_id !== 4) {
       document.querySelectorAll(".portal-nav-actions").forEach((container) => {

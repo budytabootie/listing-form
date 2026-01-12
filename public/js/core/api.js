@@ -1,5 +1,3 @@
-// public/js/core/api.js
-
 export const API = {
   _supabase: null,
   _functionUrl: null,
@@ -11,6 +9,7 @@ export const API = {
     }
   },
 
+  // --- Fungsi Database Langsung ---
   async deleteSession(token) {
     if (!token) return;
     return await this._supabase
@@ -30,60 +29,73 @@ export const API = {
     return await this._supabase.from("inventory").select("item_name, stock");
   },
 
+  // --- Fungsi Edge Functions ---
+  // --- Fungsi Edge Functions ---
   async login(username, password) {
     try {
       const response = await fetch(`${this._functionUrl}/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        headers: {
+          "Content-Type": "application/json",
+          apikey: this._supabase.supabaseKey,
+          // TAMBAHKAN INI: Agar Gateway mengizinkan request masuk
+          Authorization: `Bearer ${this._supabase.supabaseKey}`,
+        },
+        body: JSON.stringify({
+          username,
+          password: (password || "").toString().trim(),
+        }),
       });
-
       const result = await response.json();
-
-      if (response.ok && result.success && result.token) {
+      if (response.ok && result.success) {
         localStorage.setItem("sessionToken", result.token);
         localStorage.setItem("nmc_session", JSON.stringify(result.user));
         return result;
-      } else {
-        return {
-          success: false,
-          message: result.message || "Username atau Password salah!",
-        };
       }
+      return { success: false, message: result.message || "Login Gagal" };
     } catch (err) {
       return { success: false, message: "Gagal terhubung ke server." };
     }
   },
 
-  async updatePassword(userId, oldHashed, newHashed) {
+  async updatePassword(userId, oldPasswordPlain = "", newPasswordPlain = "") {
     try {
+      const token = localStorage.getItem("sessionToken");
       const sessionRaw = localStorage.getItem("nmc_session");
       const session = sessionRaw ? JSON.parse(sessionRaw) : {};
-      const token = localStorage.getItem("sessionToken");
+
+      if (!token) throw new Error("Token tidak ditemukan di storage");
+
+      const finalPassword = newPasswordPlain || oldPasswordPlain;
+      if (!finalPassword) throw new Error("Password tidak boleh kosong");
 
       const response = await fetch(`${this._functionUrl}/admin-actions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          apikey: this._supabase.supabaseKey,
+          // PERBAIKAN: Gunakan API Key untuk Authorization (untuk Gateway)
+          Authorization: `Bearer ${this._supabase.supabaseKey}`,
+          // Gunakan x-session-token untuk Session User (untuk Logika Deno)
           "x-session-token": token,
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           action: "self_change_password",
           payload: {
             user_id: userId,
-            nama_lengkap: session.nama_lengkap || "User",
-            username: session.username || "Unknown",
-            old_password: oldHashed,
-            password: newHashed,
-            admin_name: session.nama_lengkap || "System",
+            password: finalPassword.toString().trim(),
+            nama_lengkap: session.nama_lengkap || session.nama || "User",
           },
         }),
       });
 
       const result = await response.json();
-      return { success: response.ok, message: result.error || result.message };
+      if (!response.ok)
+        throw new Error(result.error || "Server menolak permintaan");
+
+      return { success: true };
     } catch (err) {
+      console.error("DETEKSI ERROR:", err.message);
       return { success: false, message: err.message };
     }
   },
@@ -92,7 +104,12 @@ export const API = {
     try {
       const response = await fetch(`${this._functionUrl}/process-order`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          apikey: this._supabase.supabaseKey,
+          // Tambahkan Authorization agar lolos Gateway
+          Authorization: `Bearer ${this._supabase.supabaseKey}`,
+        },
         body: JSON.stringify({
           ...orderData,
           token: localStorage.getItem("sessionToken"),
@@ -106,22 +123,11 @@ export const API = {
 
   async fetchSessionWithUser(token) {
     if (!token) return { data: null, error: "No token" };
-
-    // PERBAIKAN: Gunakan penamaan relasi eksplisit user_id
+    // Gunakan query standar tanpa .setHeader
     return await this._supabase
       .from("user_sessions")
       .select(
-        `
-        token, 
-        expires_at,
-        users_login:user_id (
-          id, 
-          username, 
-          nama_lengkap, 
-          role_id, 
-          has_changed_password
-        )
-      `
+        `token, expires_at, users_login:user_id (id, username, nama_lengkap, role_id, has_changed_password)`
       )
       .eq("token", token)
       .gt("expires_at", new Date().toISOString())

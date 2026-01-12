@@ -1138,3 +1138,45 @@ body.access-granted {
   margin-top: auto;
   flex-shrink: 0;
 }
+
+.swal2-input:focus {
+  border-color: #43b581 !important;
+  box-shadow: 0 0 0 2px rgba(67, 181, 129, 0.2) !important;
+}
+
+.swal2-validation-message {
+  background: #f04747 !important;
+  color: white !important;
+  border-radius: 5px;
+  margin-top: 10px !important;
+}
+
+/* Efek Glow pada input saat modal ganti password */
+#p-portal-force:focus,
+#p-1:focus,
+#p-2:focus {
+  border-color: #faa61a !important;
+  box-shadow: 0 0 10px rgba(250, 166, 26, 0.2) !important;
+  outline: none;
+}
+
+/* Animasi sederhana agar modal tidak kaku saat muncul */
+.swal2-popup {
+  border-radius: 15px !important;
+  border: 1px solid #4f545c;
+}
+
+/* Tombol konfirmasi khusus untuk force change */
+.portal-force-confirm-btn {
+  width: 100% !important;
+  font-weight: bold !important;
+  letter-spacing: 1px !important;
+  height: 45px !important;
+  border-radius: 8px !important;
+  transition: all 0.3s ease !important;
+}
+
+.portal-force-confirm-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
