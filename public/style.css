@@ -1,5 +1,4 @@
-/* Tetap pakai code asli kamu, tambahkan/sesuaikan bagian ini saja: */
-
+/* ========== 1. VARIABLES & GLOBAL ========== */
 :root {
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 70px;
@@ -7,6 +6,7 @@
   --bg-sidebar: #202225;
   --accent-color: #5865f2;
   --text-muted: #b9bbbe;
+  --success-color: #43b581;
 }
 
 * {
@@ -16,19 +16,22 @@
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden; /* Mencegah scroll ke samping di level body */
-}
-
-body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background: var(--bg-dark);
   color: white;
-  margin: 0;
-  display: flex;
   min-height: 100vh;
+  overflow-x: hidden;
+  display: none; /* Hidden by default for auth check */
 }
 
-/* SIDEBAR STRUCTURE */
+body.access-granted {
+  display: flex;
+}
+body.no-sidebar {
+  display: block !important;
+}
+
+/* ========== 2. SIDEBAR STRUCTURE ========== */
 #sidebar {
   width: var(--sidebar-width);
   background: var(--bg-sidebar);
@@ -36,9 +39,23 @@ body {
   position: fixed;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
-  flex-direction: column; /* Pastikan ini ada agar menu bisa ditumpuk ke bawah */
+  flex-direction: column;
   z-index: 1000;
   border-right: 1px solid #282b2e;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Scrollbar Sidebar (Discord Style) */
+#sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+#sidebar::-webkit-scrollbar-thumb {
+  background: #202225;
+  border-radius: 10px;
+}
+#sidebar:hover::-webkit-scrollbar-thumb {
+  background: #4f545c;
 }
 
 #sidebar.collapsed {
@@ -51,16 +68,20 @@ body {
   align-items: center;
   justify-content: space-between;
   height: 60px;
-  box-sizing: border-box;
   border-bottom: 1px solid #282b2e;
+}
+
+#sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  padding: 15px 0;
 }
 
 .sidebar-menu {
   flex: 1;
   padding: 10px;
-  margin-top: 10px;
-  display: flex; /* Tambahan: agar menu bawah bisa diposisikan */
-  flex-direction: column; /* Tambahan */
+  display: flex;
+  flex-direction: column;
+  min-height: min-content;
 }
 
 .menu-item {
@@ -83,20 +104,11 @@ body {
   text-align: center;
 }
 
-.menu-item span {
-  opacity: 1;
-  transition: opacity 0.3s;
-}
-
 #sidebar.collapsed .menu-item span,
-#sidebar.collapsed .logo-text {
+#sidebar.collapsed .logo-text,
+#sidebar.collapsed .sidebar-user {
+  display: none;
   opacity: 0;
-  pointer-events: none;
-}
-
-/* Tambahan kecil: Agar icon tetap bisa diklik saat collapsed */
-#sidebar.collapsed .menu-item {
-  padding-left: 15px;
 }
 
 .menu-item:hover,
@@ -104,74 +116,53 @@ body {
   background: #393c43;
   color: white;
 }
-
 .menu-item.logout-item:hover {
   background: #ed4245;
 }
 
-/* MAIN CONTENT STRUCTURE */
+/* ========== 3. MAIN CONTENT STRUCTURE ========== */
 .main-wrapper {
   flex: 1;
   margin-left: var(--sidebar-width);
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-
-  /* PERBAIKAN DI SINI: */
-  min-width: 0; /* Mencegah elemen di dalam (tabel) memaksa wrapper melebar */
-  width: auto; /* Jangan pakai 100% jika sudah ada margin-left */
-  max-width: calc(100% - var(--sidebar-width)); /* Kunci lebar maksimal */
+  min-width: 0;
 }
 
 .main-wrapper.expanded {
   margin-left: var(--sidebar-collapsed-width);
-  max-width: calc(100% - var(--sidebar-collapsed-width));
-}
-
-/* CSS baru agar halaman Member/User biasa tidak bergeser karena Sidebar Admin */
-body.no-sidebar {
-  display: block;
 }
 body.no-sidebar .main-wrapper {
   margin-left: 0;
-}
-
-.content-container {
-  flex: 1;
-  padding: 40px 20px;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
 }
 
 #content-area {
   padding: 40px;
   width: 100%;
   box-sizing: border-box;
-  overflow-x: hidden; /* Sembunyikan scroll horizontal utama */
 }
 
-/* FORM STYLING */
-form {
+/* ========== 4. FORMS & INPUTS ========== */
+form,
+#myForm {
   background: #2f3136;
   padding: 30px;
   border-radius: 10px;
   width: 100%;
   max-width: 450px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
 }
 
-h3 {
-  margin-top: 0;
-  color: var(--accent-color);
-  font-size: 1.5rem;
+#myForm {
+  background: #202225;
+  max-width: 640px;
+  margin: 20px auto 40px auto;
 }
-
-label {
-  display: block;
-  margin-top: 15px;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+#myForm h3 {
+  text-align: center;
+  color: #fff;
 }
 
 select,
@@ -184,15 +175,16 @@ button {
   border: 1px solid #23272a;
   background: #23272a;
   color: white;
-  box-sizing: border-box;
+  outline: none;
 }
 
 input:focus,
 select:focus {
-  outline: 1px solid var(--accent-color);
+  border-color: var(--accent-color);
 }
 
-button {
+button,
+#submitBtn {
   background: var(--accent-color);
   border: none;
   cursor: pointer;
@@ -204,13 +196,27 @@ button {
 button:hover {
   background: #4752c4;
 }
+#submitBtn:active {
+  transform: scale(0.98);
+}
 
-/* AUTOCOMPLETE & UI COMPONENTS */
+/* Remove arrow from input number */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ========== 5. AUTOCOMPLETE & COMPONENTS ========== */
 .autocomplete-wrapper {
   position: relative;
   width: 100%;
 }
-.autocomplete-items {
+.autocomplete-items,
+#autocomplete-list {
   position: absolute;
   border: 1px solid #23272a;
   z-index: 99;
@@ -220,51 +226,18 @@ button:hover {
   background-color: #23272a;
   max-height: 200px;
   overflow-y: auto;
-  border-radius: 0 0 5px 5px;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
 }
+
 .autocomplete-item {
   padding: 10px;
   cursor: pointer;
+  border-bottom: 1px solid #26292e;
+  font-size: 0.85rem;
 }
 .autocomplete-item:hover {
-  background-color: var(--accent-color);
-}
-
-#infoPaketDisplay {
-  margin-top: 15px;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  background: #23272a;
-  padding: 10px;
-  border-left: 4px solid var(--accent-color);
-}
-
-footer {
-  text-align: center;
-  padding: 20px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  border-top: 1px solid #2f3136;
-}
-
-/* Utility untuk halaman full-width tanpa sidebar (Login & Index User) */
-.no-sidebar {
-  display: block !important; /* Mematikan flex samping agar konten bisa di tengah */
-}
-
-.no-sidebar .container {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-}
-
-/* Memperbaiki posisi footer agar tetap di bawah tapi tidak menempel */
-.no-sidebar footer {
-  width: 100%;
-  position: relative;
-  margin-top: auto;
+  background-color: #3a3f45;
 }
 
 .badge {
@@ -275,309 +248,69 @@ footer {
   text-transform: uppercase;
 }
 .badge.admin {
-  background: #5865f2;
+  background: var(--accent-color);
   color: white;
 }
 .badge.user {
   background: #4f545c;
   color: #dcddde;
 }
-
-.page-nav {
-  background: #202225;
+.badge-done {
+  background: var(--success-color);
   color: white;
-  border: none;
-  padding: 5px 10px;
-  cursor: pointer;
+  padding: 2px 8px;
   border-radius: 4px;
-}
-.page-nav:hover:not(:disabled) {
-  background: #36393f;
+  font-size: 0.7rem;
 }
 
-/* ========== LISTING PAGE FORM ========== */
-
-/* Main card */
-#myForm {
-  background: #202225;
-  border-radius: 12px;
-  padding: 20px 18px;
-  max-width: 640px;
-  margin: 20px auto 40px auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  box-sizing: border-box;
-  color: #fff;
-}
-
-#myForm h3 {
-  text-align: center;
-  margin-bottom: 6px;
-  color: #fff;
-}
-
-/* Labels & controls */
-#myForm label {
-  display: block;
-  margin: 10px 0 4px;
-  font-size: 0.9rem;
-  color: #b9bbbe;
-}
-
-#myForm input[type="text"],
-#myForm input[type="number"],
-#myForm select {
-  width: 100%;
-  padding: 9px 10px;
-  border-radius: 8px;
-  border: 1px solid #2f3136;
-  background: #18191c;
-  color: #fff;
-  font-size: 0.9rem;
-  outline: none;
-  box-sizing: border-box;
-}
-
-#myForm input[type="text"]:focus,
-#myForm input[type="number"]:focus,
-#myForm select:focus {
-  border-color: #5865f2;
-}
-
-/* Autocomplete */
-#myForm .autocomplete-wrapper {
-  position: relative;
-}
-
-#autocomplete-list {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  margin-top: 3px;
-  background: #2f3136;
-  border-radius: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
-  z-index: 20;
-}
-
-.autocomplete-item {
-  padding: 8px 10px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  border-bottom: 1px solid #26292e;
-}
-
-.autocomplete-item:last-child {
-  border-bottom: none;
-}
-
-.autocomplete-item:hover {
-  background: #3a3f45;
-}
-
-/* Checkbox / qty list area (non-bundling) */
-#checkboxList {
-  margin-top: 10px;
-}
-
-/* Inputs inside the dynamic list (already inline-styled, but unify font) */
-#myForm .item-qty {
-  font-size: 0.85rem;
-  padding: 4px 6px;
-  background: #18191c;
-  border-radius: 6px;
-  border: 1px solid #2f3136;
-  color: #fff;
-}
-
-/* Submit button */
-#submitBtn {
-  margin-top: 20px;
-  width: 100%;
-  padding: 10px 0;
-  border-radius: 8px;
-  border: none;
-  background: #5865f2;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.95rem;
-  transition: background 0.2s, transform 0.05s;
-}
-
-#submitBtn:hover {
-  background: #4752c4;
-}
-
-#submitBtn:active {
-  transform: scale(0.98);
-}
-
-#submitBtn:disabled {
-  opacity: 0.7;
-  cursor: default;
-}
-
-/* ========== RESPONSIVE LISTING FORM ========== */
-
-@media (max-width: 768px) {
-  #myForm {
-    margin: 15px auto 25px auto;
-    padding: 16px 14px;
-    max-width: 100%;
-  }
-
-  #myForm h3 {
-    font-size: 1.05rem;
-  }
-
-  #myForm label {
-    font-size: 0.85rem;
-  }
-
-  #myForm input[type="text"],
-  #myForm input[type="number"],
-  #myForm select {
-    font-size: 0.85rem;
-    padding: 8px 9px;
-  }
-
-  .autocomplete-item {
-    font-size: 0.8rem;
-  }
-}
-
-@media (max-width: 480px) {
-  #myForm {
-    margin-top: 10px;
-  }
-}
-
+/* ========== 6. WEED SYSTEM STYLING ========== */
 .weed-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
   margin-top: 20px;
 }
-
 .weed-card {
   background: #2f3136;
   padding: 20px;
   border-radius: 15px;
   border: 1px solid rgba(67, 181, 129, 0.2);
 }
-
 .weed-card.full-width {
   grid-column: 1 / -1;
 }
-
-.weed-card-header {
-  font-weight: 800;
-  color: #43b581;
-  letter-spacing: 1px;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.weed-stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.stat-box {
-  background: rgba(0, 0, 0, 0.2);
-  padding: 15px;
-  border-radius: 10px;
-  text-align: center;
-}
-
-.stat-label {
-  font-size: 0.7rem;
-  color: #72767d;
-  display: block;
-}
-.stat-value {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #fff;
-}
-
-.btn-action-weed {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  background: #43b581;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  transition: 0.3s;
-}
-
-.btn-action-weed:hover {
-  background: #3ca374;
-  transform: translateY(-2px);
-}
-.btn-action-weed.secondary {
-  background: #5865f2;
-}
-.btn-action-weed.success {
-  background: #faa61a;
-}
-
-.mini-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  font-size: 0.85rem;
-}
-
-/* Weed Tracking Custom Style */
-.admin-card {
-  background: #2f3136;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
+.weed-card-header,
 .card-header-modern {
-  font-weight: bold;
-  color: #43b581;
-  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--success-color);
   letter-spacing: 1px;
-  border-bottom: 1px solid #40444b;
-  padding-bottom: 10px;
   margin-bottom: 15px;
+  text-transform: uppercase;
 }
 
+.weed-stats-grid,
 .inventory-stats {
   display: flex;
   gap: 10px;
   margin-bottom: 15px;
 }
-
+.stat-box,
 .inv-box {
   flex: 1;
-  background: #202225;
+  background: rgba(0, 0, 0, 0.2);
   padding: 15px;
-  border-radius: 8px;
+  border-radius: 10px;
   text-align: center;
 }
-
+.stat-label,
 .inv-box .label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #72767d;
   display: block;
 }
+.stat-value,
 .inv-box .value {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: bold;
   color: #fff;
 }
@@ -591,7 +324,6 @@ footer {
   border-radius: 8px;
   margin-bottom: 10px;
 }
-
 .batch-info {
   display: flex;
   flex-direction: column;
@@ -601,51 +333,89 @@ footer {
   color: #b9bbbe;
 }
 
+.btn-action-weed,
 .btn-primary-weed,
-.btn-secondary-weed,
 .btn-success-weed {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: none;
-  border-radius: 5px;
-  color: white;
+  border-radius: 8px;
   font-weight: bold;
   cursor: pointer;
-}
-
-.btn-primary-weed {
-  background: #5865f2;
-}
-.btn-secondary-weed {
-  background: #4f545c;
-}
-.btn-success-weed {
-  background: #43b581;
-}
-
-.badge-done {
-  background: #43b581;
+  transition: 0.3s;
   color: white;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.7rem;
+}
+.btn-primary-weed,
+.btn-action-weed.secondary {
+  background: var(--accent-color);
+}
+.btn-success-weed,
+.btn-action-weed {
+  background: var(--success-color);
+}
+.btn-action-weed.success {
+  background: #faa61a;
 }
 
-/* Menghilangkan panah atas/bawah bawaan browser */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-input[type="number"] {
-  -moz-appearance: textfield; /* Untuk Firefox */
-}
-
-/* Sembunyikan body saat loading access */
-body {
+/* ========== 7. RESPONSIVE & MOBILE TRIGGER ========== */
+.mobile-nav-toggle {
   display: none;
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1100;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  align-items: center;
+  justify-content: center;
 }
-body.access-granted {
-  display: block;
+
+@media (max-width: 768px) {
+  body.access-granted {
+    display: block;
+  }
+  .mobile-nav-toggle {
+    display: flex;
+  }
+
+  #sidebar {
+    left: -var(--sidebar-width);
+  }
+  #sidebar.open {
+    left: 0;
+    box-shadow: 5px 0 25px rgba(0, 0, 0, 0.5);
+  }
+  #toggleBtn {
+    display: none;
+  }
+
+  .main-wrapper {
+    margin-left: 0 !important;
+    max-width: 100% !important;
+  }
+  #content-area {
+    padding: 20px;
+    padding-top: 80px;
+  }
+
+  #myForm {
+    margin: 15px auto 25px auto;
+    padding: 16px 14px;
+    max-width: 100%;
+  }
+}
+
+footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border-top: 1px solid #2f3136;
+  margin-top: auto;
 }

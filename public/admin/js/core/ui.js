@@ -102,12 +102,43 @@ export const UI = {
 
   setupGlobalEvents(logoutFn) {
     window.logout = logoutFn;
-    const toggleBtn = document.getElementById("toggleBtn");
+
+    const sidebar = document.getElementById("sidebar");
+    const mainWrapper = document.getElementById("mainWrapper");
+    const toggleBtn = document.getElementById("toggleBtn"); // Desktop
+    const mobileTrigger = document.getElementById("mobileTrigger"); // Mobile
+
+    // 1. Handler Desktop (Collapse)
     if (toggleBtn) {
       toggleBtn.onclick = () => {
-        document.getElementById("sidebar").classList.toggle("collapsed");
-        document.getElementById("mainWrapper").classList.toggle("expanded");
+        sidebar.classList.toggle("collapsed");
+        mainWrapper.classList.toggle("expanded");
       };
     }
+
+    // 2. Handler Mobile (Slide Open)
+    if (mobileTrigger) {
+      mobileTrigger.onclick = (e) => {
+        e.stopPropagation(); // Mencegah bubbling
+        sidebar.classList.toggle("open");
+      };
+    }
+
+    // 3. Auto-Close & Click Outside (Mobile)
+    document.addEventListener("click", (e) => {
+      if (window.innerWidth <= 768) {
+        const isClickInsideSidebar = sidebar.contains(e.target);
+        const isClickOnTrigger =
+          mobileTrigger && mobileTrigger.contains(e.target);
+
+        // Tutup jika klik menu-item ATAU klik di luar sidebar saat terbuka
+        if (
+          e.target.closest(".menu-item") ||
+          (!isClickInsideSidebar && !isClickOnTrigger)
+        ) {
+          sidebar.classList.remove("open");
+        }
+      }
+    });
   },
 };
