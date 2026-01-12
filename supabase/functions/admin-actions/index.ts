@@ -100,13 +100,14 @@ serve(async (req) => {
       (action === "create_user" || action === "reset_password") &&
       payload.discord_id
     ) {
+      // Ambil origin dari referer atau gunakan payload app_url
       const origin = req.headers.get("referer")
-        ? new URL(req.headers.get("referer")).origin
-        : "";
+        ? new URL(req.headers.get("referer")!).origin
+        : "http://localhost:3000"; // Fallback jika tidak ada referer
       const portalUrl = payload.app_url || origin;
       const messageContent = action === "create_user"
-        ? `🆕 **AKUN PORTAL BARU**\n\n👤 Username: \`${payload.username}\`\n🔑 Password: \`${plain_p}\`\n🌐 Link: ${portalUrl}`
-        : `🔄 **RESET PASSWORD**\n\n👤 Username: \`${payload.username}\`\n🔑 Password Baru: \`${plain_p}\``;
+        ? `🆕 **AKUN PORTAL BARU**\n\n👤 Username: \`${payload.username}\`\n🔑 Password: \`${plain_p}\`\n🌐 Link: ${portalUrl}\n\n⚠️ *Segera login dan ganti password Anda.*`
+        : `🔄 **RESET PASSWORD PORTAL**\n\n👤 Username: \`${payload.username}\`\n🔑 Password Baru: \`${plain_p}\`\n🌐 Link: ${portalUrl}\n\n⚠️ *Segera login dan ganti kembali password Anda.*`;
 
       await fetch(
         `${Deno.env.get("SUPABASE_URL")}/functions/v1/discord-notifier`,
