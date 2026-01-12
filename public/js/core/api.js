@@ -124,10 +124,18 @@ export const API = {
   async fetchSessionWithUser(token) {
     if (!token) return { data: null, error: "No token" };
     // Gunakan query standar tanpa .setHeader
+    // BARU
     return await this._supabase
       .from("user_sessions")
       .select(
-        `token, expires_at, users_login:user_id (id, username, nama_lengkap, role_id, has_changed_password)`
+        `token, expires_at, users_login:user_id (
+      id, 
+      username, 
+      nama_lengkap, 
+      role_id, 
+      has_changed_password,
+      roles:role_id (role_name)
+    )`
       )
       .eq("token", token)
       .gt("expires_at", new Date().toISOString())

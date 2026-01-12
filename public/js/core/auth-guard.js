@@ -34,7 +34,7 @@ export async function runAuthGuard(basePath = "") {
         global: {
           headers: {
             // Kita gunakan nama header custom agar tidak memicu check JWT
-            'x-session-token': token 
+            "x-session-token": token,
           },
         },
       }
@@ -73,10 +73,15 @@ export async function runAuthGuard(basePath = "") {
     window._supabase = supabase;
     window._userData = userData;
 
-    // Proteksi Admin
+    // Proteksi Admin (DIPERBAIKI)
     const isAdminPage = window.location.pathname.includes("/admin/");
-    if (isAdminPage && userData.role_id !== 1) {
-      alert("Akses Ditolak!");
+
+    // Daftar Role yang BOLEH masuk ke folder /admin/
+    // 1: Super Admin, 2: Treasurer, 3: Staff, 5: BNN
+    const allowedAdminRoles = [1, 2, 3, 5];
+
+    if (isAdminPage && !allowedAdminRoles.includes(userData.role_id)) {
+      alert("Akses Ditolak: Anda tidak memiliki otoritas admin!");
       window.location.href = `${basePath}index.html`;
       return;
     }

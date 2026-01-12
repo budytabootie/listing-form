@@ -57,7 +57,9 @@ async function init() {
 
   // 5. Update Nama Display ke UI
   if (window.syncUserUI) {
-    window.syncUserUI(user.nama_lengkap, user.rank || "MEMBER");
+    // Mengambil role_name dari relasi yang baru ditambahkan
+    const roleDisplay = user.roles?.role_name || "MEMBER";
+    window.syncUserUI(user.nama_lengkap, roleDisplay);
   }
 
   // 6. Masuk ke Halaman Default

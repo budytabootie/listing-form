@@ -104,11 +104,18 @@ async function init() {
   await Navigation.renderSidebar();
 
   // 5. Default Routing
-  const defaultPage = [1, 2].includes(user.role_id)
-    ? "dashboard"
-    : user.role_id === 5
-    ? "weed"
-    : "katalog";
+  // Kita tentukan halaman awal berdasarkan role
+  let defaultPage = "dashboard"; // Default untuk Super Admin & Treasurer
+
+  if (user.role_id === 5) {
+    defaultPage = "weed"; // Khusus BNN
+  } else if (user.role_id === 3) {
+    defaultPage = "orders"; // Staff diarahkan ke Orders atau Katalog (sesuaikan keinginan)
+  } else if (![1, 2].includes(user.role_id)) {
+    // Jika ada role lain yang nyasar tapi punya akses admin
+    defaultPage = "profile";
+  }
+
   Navigation.loadPage(defaultPage);
 }
 
