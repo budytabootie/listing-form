@@ -120,7 +120,7 @@ export const UsersPage = {
       }
     };
 
-    const showEditModal = async (user) => {
+    const showEditModal = async (targetUser) => {
       await Swal.fire({
         title: "Edit User Access",
         background: "#2f3136",
@@ -133,52 +133,82 @@ export const UsersPage = {
                 .map(
                   (r) =>
                     `<option value="${r.id}" ${
-                      r.id === user.role_id ? "selected" : ""
+                      r.id === targetUser.role_id ? "selected" : ""
                     }>${r.role_name}</option>`
                 )
                 .join("")}
             </select>
             <hr style="border:0; border-top:1px solid #4f545c; margin:20px 0;">
-            <button id="btnResetPass" class="swal2-confirm swal2-styled" style="background:#faa61a; width:100%; margin:0;">RESET & DM PASSWORD BARU</button>
+            <button id="btnResetPass" class="swal2-confirm swal2-styled" style="background:#faa61a; width:100%; margin:0; border-radius:4px; font-weight:bold;">RESET & DM PASSWORD BARU</button>
           </div>
         `,
         showConfirmButton: true,
         confirmButtonText: "SIMPAN ROLE",
+        showCancelButton: true,
+        cancelButtonColor: "#4f545c",
         didOpen: () => {
           document.getElementById("btnResetPass").onclick = async () => {
             const newPass = generatePass();
             const member = st.membersList.find(
-              (m) => m.nama === user.nama_lengkap
+              (m) => m.nama === targetUser.nama_lengkap
             );
 
             Swal.showLoading();
             const res = await callAdminAction("reset_password", {
-              user_id: user.id,
-              nama_lengkap: user.nama_lengkap,
-              username: user.username,
-              password: newPass, // KIRIM POLOS KE EDGE
+              user_id: targetUser.id,
+              nama_lengkap: targetUser.nama_lengkap,
+              username: targetUser.username,
+              password: newPass,
               discord_id: member?.discord_id,
               app_url: window.location.origin,
+              is_encrypted: true,
             });
 
             if (res.success) {
-              Swal.fire(
-                "Berhasil",
-                "Password direset & dikirim ke Discord.",
-                "success"
-              );
+              if (window.createAuditLog) {
+                await window.createAuditLog(
+                  "UPDATE",
+                  "users_login",
+                  `Reset password user @${targetUser.username}`
+                );
+              }
+              Swal.fire({
+                icon: "success",
+                title: "Berhasil",
+                text: "Password direset & dikirim ke Discord.",
+                background: "#2f3136",
+                color: "#fff",
+              });
               loadUsers();
             }
           };
         },
         preConfirm: async () => {
           const newRoleId = document.getElementById("editRole").value;
+
+          // 1. Update Role di tabel users_login
           const { error } = await supabase
             .from("users_login")
             .update({ role_id: parseInt(newRoleId) })
-            .eq("id", user.id);
-          if (error) Swal.fire("Error", "Gagal update role", "error");
-          loadUsers();
+            .eq("id", targetUser.id);
+
+          if (!error) {
+            // 2. Hapus semua session user tersebut agar dia "Logout Paksa"
+            // Ini memastikan Rudy tidak bisa pakai token lamanya lagi.
+            await supabase
+              .from("user_sessions")
+              .delete()
+              .eq("user_id", targetUser.id);
+
+            if (window.createAuditLog) {
+              await window.createAuditLog(
+                "UPDATE",
+                "users_login",
+                `Mengubah role @${targetUser.username} dan reset session.`
+              );
+            }
+            loadUsers();
+          }
         },
       });
     };
@@ -221,17 +251,17 @@ export const UsersPage = {
 
       tableBody.querySelectorAll(".btn-edit-user").forEach((btn) => {
         btn.onclick = () => {
-          const user = items.find((u) => u.id == btn.dataset.id);
-          if (user) showEditModal(user);
+          const userObj = items.find((u) => u.id == btn.dataset.id);
+          if (userObj) showEditModal(userObj);
         };
       });
 
       tableBody.querySelectorAll(".btn-delete-user").forEach((btn) => {
         btn.onclick = async () => {
-          const user = items.find((u) => u.id == btn.dataset.id);
+          const userObj = items.find((u) => u.id == btn.dataset.id);
           const res = await Swal.fire({
             title: "Hapus Akses?",
-            text: `Akun ${user.nama_lengkap} akan dihapus permanen.`,
+            text: `Akun ${userObj.nama_lengkap} akan dihapus permanen.`,
             icon: "warning",
             showCancelButton: true,
             confirmButtonColor: "#ed4245",
@@ -242,11 +272,18 @@ export const UsersPage = {
           if (res.isConfirmed) {
             Swal.showLoading();
             const result = await callAdminAction("delete_user", {
-              user_id: user.id,
-              nama_lengkap: user.nama_lengkap,
-              username: user.username,
+              user_id: userObj.id,
+              nama_lengkap: userObj.nama_lengkap,
+              username: userObj.username,
             });
             if (result.success) {
+              if (window.createAuditLog) {
+                await window.createAuditLog(
+                  "DELETE",
+                  "users_login",
+                  `Menghapus akses user @${userObj.username}`
+                );
+              }
               Swal.fire("Dihapus", "Akses user telah dicabut.", "success");
               loadUsers();
             }
@@ -349,12 +386,19 @@ export const UsersPage = {
         nama_lengkap,
         username,
         role_id: parseInt(role_id),
-        password: passwordPlain, // KIRIM POLOS KE EDGE
+        password: passwordPlain,
         discord_id: member?.discord_id,
         app_url: window.location.origin,
       });
 
       if (res.success) {
+        if (window.createAuditLog) {
+          await window.createAuditLog(
+            "CREATE",
+            "users_login",
+            `Membuat akun @${username} untuk member ${nama_lengkap}`
+          );
+        }
         Swal.fire({
           title: "Berhasil",
           icon: "success",

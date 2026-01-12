@@ -17,11 +17,17 @@
 
     <script type="module">
         import { runAuthGuard } from "../js/core/auth-guard.js";
-        runAuthGuard("../"); // Base path naik satu folder
+        // Tambahkan delay kecil untuk memastikan state login stabil
+        setTimeout(() => {
+            runAuthGuard("../");
+        }, 100);
     </script>
 </head>
 
 <body>
+    <button id="mobileTrigger" class="mobile-nav-toggle">
+        <i class="fas fa-bars"></i>
+    </button>
     <nav id="sidebar">
         <div class="sidebar-header">
             <img src="../images/FULL-LOGO-NMC.png" style="width: 40px;" />
@@ -40,8 +46,7 @@
     </nav>
 
     <div class="main-wrapper" id="mainWrapper">
-        <div id="content-area" style="padding: 40px;">
-        </div>
+        <div id="content-area"></div>
     </div>
 
     <script type="module" src="script.js"></script>

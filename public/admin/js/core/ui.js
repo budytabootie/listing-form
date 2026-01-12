@@ -32,10 +32,9 @@ export const UI = {
           allowOutsideClick: false,
           didOpen: () => Swal.showLoading(),
         });
-        const hashed = CryptoJS.SHA256(formValues).toString();
 
         // Memanggil API yang sudah di-init di script.js
-        const result = await API.updatePassword(userData.id, hashed);
+        const result = await API.updatePassword(userData.id, "", formValues);
 
         if (result.success) {
           Swal.fire({
@@ -43,6 +42,7 @@ export const UI = {
             title: "Berhasil",
             background: "#2f3136",
           });
+          await Auth.logout();
         } else {
           Swal.fire("Gagal", result.message || "Terjadi kesalahan", "error");
         }
@@ -79,19 +79,18 @@ export const UI = {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-      const hashed = CryptoJS.SHA256(newPass).toString();
-      const result = await API.updatePassword(userData.id, hashed);
+      const result = await API.updatePassword(userData.id, "", newPass);
 
       if (result.success) {
         await Swal.fire({
           icon: "success",
           title: "Berhasil",
-          text: "Akses Admin diberikan.",
+          text: "Password diperbarui. Silakan login kembali.",
           background: "#2f3136",
-          timer: 1500,
-          showConfirmButton: false,
         });
-        location.reload();
+        const token = localStorage.getItem("sessionToken");
+        await Auth.logout(token);
+        window.location.href = "/login.html";
       } else {
         Swal.fire("Gagal", result.message, "error").then(() =>
           this.forceChangePassword(userData)
@@ -102,12 +101,43 @@ export const UI = {
 
   setupGlobalEvents(logoutFn) {
     window.logout = logoutFn;
-    const toggleBtn = document.getElementById("toggleBtn");
+
+    const sidebar = document.getElementById("sidebar");
+    const mainWrapper = document.getElementById("mainWrapper");
+    const toggleBtn = document.getElementById("toggleBtn"); // Desktop
+    const mobileTrigger = document.getElementById("mobileTrigger"); // Mobile
+
+    // 1. Handler Desktop (Collapse)
     if (toggleBtn) {
       toggleBtn.onclick = () => {
-        document.getElementById("sidebar").classList.toggle("collapsed");
-        document.getElementById("mainWrapper").classList.toggle("expanded");
+        sidebar.classList.toggle("collapsed");
+        mainWrapper.classList.toggle("expanded");
       };
     }
+
+    // 2. Handler Mobile (Slide Open)
+    if (mobileTrigger) {
+      mobileTrigger.onclick = (e) => {
+        e.stopPropagation(); // Mencegah bubbling
+        sidebar.classList.toggle("open");
+      };
+    }
+
+    // 3. Auto-Close & Click Outside (Mobile)
+    document.addEventListener("click", (e) => {
+      if (window.innerWidth <= 768) {
+        const isClickInsideSidebar = sidebar.contains(e.target);
+        const isClickOnTrigger =
+          mobileTrigger && mobileTrigger.contains(e.target);
+
+        // Tutup jika klik menu-item ATAU klik di luar sidebar saat terbuka
+        if (
+          e.target.closest(".menu-item") ||
+          (!isClickInsideSidebar && !isClickOnTrigger)
+        ) {
+          sidebar.classList.remove("open");
+        }
+      }
+    });
   },
 };

@@ -51,6 +51,37 @@ async function init() {
   API.init(supabase, config.supabaseUrl);
   // --------------------------------------------
 
+  // --- DAFTARKAN HELPER GLOBAL DI SINI ---
+  window.createAuditLog = async (action, tableName, description) => {
+    try {
+      const { error } = await supabase.from("audit_logs").insert([
+        {
+          user_id: user.id, // ID dari user yang sedang login
+          username: user.username,
+          action: action,
+          table_name: tableName,
+          description: description,
+        },
+      ]);
+
+      if (error) {
+        console.error("Gagal menyimpan audit log:", error.message);
+      }
+    } catch (err) {
+      console.error("Audit Log System Error:", err);
+    }
+  };
+  // ----------------------------------------
+
+  if (!sessionStorage.getItem("login_logged")) {
+    window.createAuditLog(
+      "LOGIN",
+      "users_login",
+      `Admin ${user.nama_lengkap} masuk ke dashboard`
+    );
+    sessionStorage.setItem("login_logged", "true");
+  }
+
   // 1. Sinkronkan Global Helper
   window.loadPage = (page) => Navigation.loadPage(page);
 
@@ -73,11 +104,18 @@ async function init() {
   await Navigation.renderSidebar();
 
   // 5. Default Routing
-  const defaultPage = [1, 2].includes(user.role_id)
-    ? "dashboard"
-    : user.role_id === 5
-    ? "weed"
-    : "katalog";
+  // Kita tentukan halaman awal berdasarkan role
+  let defaultPage = "dashboard"; // Default untuk Super Admin & Treasurer
+
+  if (user.role_id === 5) {
+    defaultPage = "weed"; // Khusus BNN
+  } else if (user.role_id === 3) {
+    defaultPage = "orders"; // Staff diarahkan ke Orders atau Katalog (sesuaikan keinginan)
+  } else if (![1, 2].includes(user.role_id)) {
+    // Jika ada role lain yang nyasar tapi punya akses admin
+    defaultPage = "profile";
+  }
+
   Navigation.loadPage(defaultPage);
 }
 
