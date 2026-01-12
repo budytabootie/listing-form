@@ -32,10 +32,9 @@ export const UI = {
           allowOutsideClick: false,
           didOpen: () => Swal.showLoading(),
         });
-        const hashed = CryptoJS.SHA256(formValues).toString();
 
         // Memanggil API yang sudah di-init di script.js
-        const result = await API.updatePassword(userData.id, hashed);
+        const result = await API.updatePassword(userData.id, "", formValues);
 
         if (result.success) {
           Swal.fire({
@@ -43,6 +42,7 @@ export const UI = {
             title: "Berhasil",
             background: "#2f3136",
           });
+          await Auth.logout();
         } else {
           Swal.fire("Gagal", result.message || "Terjadi kesalahan", "error");
         }
@@ -79,19 +79,18 @@ export const UI = {
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
-      const hashed = CryptoJS.SHA256(newPass).toString();
-      const result = await API.updatePassword(userData.id, hashed);
+      const result = await API.updatePassword(userData.id, "", newPass);
 
       if (result.success) {
         await Swal.fire({
           icon: "success",
           title: "Berhasil",
-          text: "Akses Admin diberikan.",
+          text: "Password diperbarui. Silakan login kembali.",
           background: "#2f3136",
-          timer: 1500,
-          showConfirmButton: false,
         });
-        location.reload();
+        const token = localStorage.getItem("sessionToken");
+        await Auth.logout(token);
+        window.location.href = "/login.html";
       } else {
         Swal.fire("Gagal", result.message, "error").then(() =>
           this.forceChangePassword(userData)

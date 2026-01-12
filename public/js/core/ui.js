@@ -146,13 +146,15 @@ export const PortalUI = {
         await Swal.fire({
           icon: "success",
           title: "Akses Diberikan",
-          text: "Password telah diperbarui. Silakan login kembali untuk masuk ke Portal.",
+          text: "Password telah diperbarui. Silakan login kembali.",
           background: "#2f3136",
           color: "#fff",
           confirmButtonColor: "#43b581",
         });
 
-        Auth.logout(localStorage.getItem("sessionToken"));
+        // Gunakan await untuk memastikan session di DB terhapus sebelum redirect
+        await Auth.logout(localStorage.getItem("sessionToken"));
+        window.location.href = "/login.html"; // Paksa pindah halaman
       } else {
         Swal.fire({
           icon: "error",
@@ -166,7 +168,10 @@ export const PortalUI = {
   },
 
   setupAdminButton(userData) {
-    if (userData.role_id !== 4) {
+    // Role yang diperbolehkan masuk admin: 1 (Super Admin), 2 (Treasurer), 3 (Staff), 5 (BNN)
+    const allowedAdminRoles = [1, 2, 3, 5];
+
+    if (allowedAdminRoles.includes(userData.role_id)) {
       document.querySelectorAll(".portal-nav-actions").forEach((container) => {
         if (!container.querySelector(".btn-go-admin")) {
           const btnAdmin = document.createElement("button");
