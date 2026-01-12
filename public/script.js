@@ -62,7 +62,32 @@ async function init() {
     window.syncUserUI(user.nama_lengkap, roleDisplay);
   }
 
-  // 6. Masuk ke Halaman Default
+  // 6. Masuk ke Halaman Default dengan Pilihan Role
+  const allowedAdminRoles = [1, 2, 3, 5];
+
+  if (allowedAdminRoles.includes(user.role_id)) {
+    // Tampilkan pilihan ke Admin atau Portal Utama menggunakan Swal
+    const { isConfirmed } = await Swal.fire({
+      title: '<span style="color: #fff;">Selamat Datang Kembali</span>',
+      text: "Anda memiliki akses manajemen. Pilih tujuan Anda:",
+      icon: "info",
+      background: "#2f3136",
+      color: "#fff",
+      showCancelButton: true,
+      confirmButtonColor: "#5865F2",
+      cancelButtonColor: "#43b581",
+      confirmButtonText: '<i class="fas fa-user-shield"></i> PANEL ADMIN',
+      cancelButtonText: '<i class="fas fa-shopping-cart"></i> PORTAL UTAMA',
+      allowOutsideClick: false, // Biar user harus pilih
+    });
+
+    if (isConfirmed) {
+      window.location.href = "admin/index.html";
+      return; // Stop eksekusi agar tidak load home
+    }
+  }
+
+  // Jika user biasa (Member) atau milih "Portal Utama", load home
   Navigation.loadPage("home");
 }
 
