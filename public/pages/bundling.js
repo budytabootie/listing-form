@@ -20,7 +20,9 @@ export const BundlingPage = {
                     isOut ? "#ed4245" : "#43b581"
                   }; font-weight: bold; margin-top: 2px;">
                     ${
-                      isOut ? "STOK TIDAK CUKUP" : `TERSEDIA: ${paket.stok} PAKET`
+                      isOut
+                        ? "STOK TIDAK CUKUP"
+                        : `TERSEDIA: ${paket.stok} PAKET`
                     }
                   </div>
               </div>
@@ -160,7 +162,6 @@ export const BundlingPage = {
               ?.stock ||
               0);
 
-          // Kurangi stok dengan yang sudah ada di cart (jika ada item satuan yang sama)
           stokTersedia -= GlobalCart.getQtyInCart(item.nama_barang_stok);
 
           const kapasitas = Math.floor(stokTersedia / item.jumlah_potong);
@@ -198,18 +199,23 @@ export const BundlingPage = {
           price
         );
         document.getElementById("submitBundle").onclick = () => {
-          const qty = parseInt(document.getElementById("bundleQty").value);
-          if (
-            GlobalCart.addToCart(
-              {
-                nama: name,
-                harga: Number(price),
-                kategori: "Bundling",
-                qty: qty,
-              },
-              availableStock + GlobalCart.getQtyInCart(name)
-            )
-          ) {
+          const qtyField = document.getElementById("bundleQty");
+          const qty = parseInt(qtyField.value);
+
+          if (isNaN(qty) || qty < 1) return;
+
+          // Perbaikan pengiriman data ke Cart
+          const success = GlobalCart.addToCart(
+            {
+              nama: name,
+              harga: price, // Tetap gunakan price original (number)
+              kategori: "Bundling",
+              qty: qty,
+            },
+            availableStock + GlobalCart.getQtyInCart(name)
+          );
+
+          if (success) {
             window.loadPage("bundling");
           }
         };

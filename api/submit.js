@@ -11,7 +11,6 @@ module.exports = async (req, res) => {
     return res.status(405).json({ message: "Metode tidak diizinkan" });
   }
 
-  // Menangkap 'items' (Array) yang dikirim dari CartPage baru
   const { nama, userId, items, totalHarga } = req.body;
 
   if (!nama || !userId || !items || !Array.isArray(items)) {
@@ -22,7 +21,6 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // 1. Ambil data Rank & Discord ID dari tabel members
     const { data: member } = await supabase
       .from("members")
       .select("rank, discord_id")
@@ -32,7 +30,7 @@ module.exports = async (req, res) => {
     const finalRank = member?.rank || "Member";
     const mentionUser = member?.discord_id ? `<@${member.discord_id}>` : nama;
 
-    // 2. INSERT KE TABEL UTAMA (orders) - Sebagai Kepala Pesanan
+    // 2. INSERT KE TABEL UTAMA (orders)
     const { data: newOrder, error: dbError } = await supabase
       .from("orders")
       .insert([
@@ -42,13 +40,16 @@ module.exports = async (req, res) => {
           status: "pending",
           rank: finalRank,
           created_at: new Date().toISOString(),
-          // SINKRONKAN DENGAN HISTORY PAGE:
           item_name:
             items.length > 1
               ? `${items[0].nama} (+${items.length - 1} lainnya)`
               : items[0].nama,
           item_type:
-            items.length > 1 ? "MULTI ITEMS" : items[0].kategori || "General",
+            items.length > 1
+              ? "MULTI ITEMS"
+              : items[0].kategori === "Bundling"
+              ? "Bundling"
+              : items[0].kategori || "General",
           quantity: items.reduce((sum, i) => sum + (i.qty || 1), 0),
         },
       ])
@@ -57,13 +58,18 @@ module.exports = async (req, res) => {
 
     if (dbError) throw dbError;
 
-    // 3. INSERT KE TABEL RINCIAN (order_items) - Memasukkan tiap barang secara terpisah
+    // 3. INSERT KE TABEL RINCIAN (order_items)
     const itemInserts = items.map((item) => ({
-      order_id: newOrder.id, // Menghubungkan ke ID di tabel orders
+      order_id: newOrder.id,
       item_name: item.nama,
-      item_type: item.kategori,
+      // MEMASTIKAN KATEGORI BUNDLING TERSIMPAN BENAR
+      item_type:
+        item.kategori === "Bundling" ? "Bundling" : item.kategori || "General",
       quantity: item.qty || 1,
-      price: `$${(item.harga * (item.qty || 1)).toLocaleString()}`,
+      price:
+        typeof item.harga === "string"
+          ? item.harga
+          : `$${(item.harga * (item.qty || 1)).toLocaleString()}`,
       status: "pending",
     }));
 
@@ -73,7 +79,7 @@ module.exports = async (req, res) => {
 
     if (itemsError) throw itemsError;
 
-    // 4. GENERATE CUSTOM ORDER ID (Untuk Discord)
+    // 4. GENERATE CUSTOM ORDER ID
     const now = new Date();
     const yy = now.getFullYear().toString().slice(-2);
     const mm = (now.getMonth() + 1).toString().padStart(2, "0");
@@ -84,12 +90,16 @@ module.exports = async (req, res) => {
 
     // 5. LOGIKA WEBHOOK DISCORD
     const discordItemsDetail = items
-      .map((i) => `- ${i.nama} (${i.qty}x)`)
+      .map(
+        (i) =>
+          `- ${i.nama} (${i.qty}x) ${
+            i.kategori === "Bundling" ? "[PAKET]" : ""
+          }`
+      )
       .join("\n");
     let targetWebhook = process.env.DISCORD_WEBHOOK_URL;
-    let embedColor = 0x2ecc71; // Default Hijau
+    let embedColor = 0x2ecc71;
 
-    // Kirim ke Discord
     await fetch(targetWebhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -90,16 +90,22 @@ export const OrdersPage = {
               const stockItem = OrdersPage.state.inventory.find(
                 (i) => i.item_name === item.item_name
               );
+
+              const isBundling = item.item_type === "Bundling";
               const stockExist = stockItem ? stockItem.stock : 0;
-              const isStockLow = stockExist < item.quantity;
+              // Jika bundling, bypass check stock low agar tombol tidak mati (stok dicek saat klik approve)
+              const isStockLow = isBundling
+                ? false
+                : stockExist < item.quantity;
 
               const categoryColors = {
                 Weapon: "#e74c3c",
                 Ammo: "#f1c40f",
                 Vest: "#3498db",
                 Attachment: "#e67e22",
+                Bundling: "#9b59b6",
               };
-              const safeType = item.item_type || order.item_type || "Item";
+              const safeType = item.item_type || "Item";
               const typeColor = categoryColors[safeType] || "#72767d";
 
               return `
@@ -111,7 +117,9 @@ export const OrdersPage = {
                   } <span style="color:#43b581;">x${item.quantity}</span></div>
                   <div style="font-size:0.75rem; color:${
                     isStockLow ? "#f04747" : "#b9bbbe"
-                  };">Gudang: ${stockExist}</div>
+                  };">${
+                isBundling ? "Paket Bundling" : "Gudang: " + stockExist
+              }</div>
                 </div>
                 <div style="display:flex; gap:10px;">
                   <button class="btn-item-action" data-item-id="${
@@ -170,79 +178,119 @@ export const OrdersPage = {
       }
 
       try {
-        let snNotes = "";
-        const katalogItem = OrdersPage.state.katalog.find(
-          (k) => k.nama_barang === item.item_name
-        );
+        let finalSnNotes = "";
+        let selectedWeaponData = []; // Untuk menyimpan ID SN yang akan di-update
 
-        if (katalogItem?.jenis_barang === "Weapon") {
-          const { data: units } = await supabase
-            .from("inventory_weapons")
-            .select("id, serial_number")
-            .eq("weapon_name", item.item_name)
-            .eq("status", "available")
-            .is("hold_by", null);
+        // LOGIKA PENGECEKAN BUNDLING VS SATUAN
+        if (item.item_type === "Bundling") {
+          const { data: components, error: bErr } = await supabase
+            .from("bundle_items")
+            .select("nama_barang_stok, jumlah_potong")
+            .eq("nama_paket", item.item_name);
 
-          if (!units || units.length < item.quantity)
-            throw new Error("Stok SN tidak cukup!");
+          if (bErr || !components || components.length === 0)
+            throw new Error("Komponen bundling tidak ditemukan!");
 
-          const { value: selectedSns } = await Swal.fire({
-            title: "Pilih SN",
-            background: "#2f3136",
-            color: "#fff",
-            html: `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">${units
-              .map(
-                (u) =>
-                  `<button class="sn-choice" data-id="${u.id}" data-sn="${u.serial_number}" style="background:#202225; border:1px solid #4f545c; color:#eee; padding:8px; border-radius:6px; cursor:pointer;">${u.serial_number}</button>`
-              )
-              .join("")}</div>`,
-            didOpen: () => {
-              let count = 0;
-              document.querySelectorAll(".sn-choice").forEach(
-                (b) =>
-                  (b.onclick = () => {
-                    if (b.classList.toggle("selected")) {
-                      if (count < item.quantity) {
-                        b.style.background = "#43b58144";
-                        b.style.borderColor = "#43b581";
-                        count++;
-                      } else {
-                        b.classList.remove("selected");
-                      }
-                    } else {
-                      b.style.background = "#202225";
-                      b.style.borderColor = "#4f545c";
-                      count--;
-                    }
-                  })
+          // Iterasi setiap komponen dalam bundling
+          for (const comp of components) {
+            const katalogComp = OrdersPage.state.katalog.find(
+              (k) => k.nama_barang === comp.nama_barang_stok
+            );
+            const totalQtyNeeded = comp.jumlah_potong * item.quantity;
+
+            if (katalogComp?.jenis_barang === "Weapon") {
+              const sns = await pickSnForWeapon(
+                comp.nama_barang_stok,
+                totalQtyNeeded
               );
-            },
-            preConfirm: () => {
-              const sel = document.querySelectorAll(".sn-choice.selected");
-              if (sel.length !== item.quantity)
-                return Swal.showValidationMessage(`Pilih ${item.quantity} SN!`);
-              return Array.from(sel).map((el) => ({
-                id: el.dataset.id,
-                sn: el.dataset.sn,
-              }));
-            },
-          });
+              if (!sns) return; // User cancel
 
-          if (!selectedSns) return;
-          snNotes = selectedSns.map((s) => s.sn).join(", ");
+              finalSnNotes += `${comp.nama_barang_stok}: ${sns
+                .map((s) => s.sn)
+                .join(", ")} | `;
+              selectedWeaponData.push(...sns.map((s) => s.id));
+            }
+          }
+        } else {
+          // LOGIKA SATUAN LAMA
+          const katalogItem = OrdersPage.state.katalog.find(
+            (k) => k.nama_barang === item.item_name
+          );
+          if (katalogItem?.jenis_barang === "Weapon") {
+            const sns = await pickSnForWeapon(item.item_name, item.quantity);
+            if (!sns) return;
+            finalSnNotes = sns.map((s) => s.sn).join(", ");
+            selectedWeaponData.push(...sns.map((s) => s.id));
+          }
+        }
+
+        // Jika ada senjata (baik satuan/bundling), update status SN
+        if (selectedWeaponData.length > 0) {
           await supabase
             .from("inventory_weapons")
             .update({ status: "in_use", hold_by: order.requested_by })
-            .in(
-              "id",
-              selectedSns.map((s) => s.id)
-            );
+            .in("id", selectedWeaponData);
         }
 
-        await processItem(order, item, "approved", snNotes);
+        await processItem(order, item, "approved", finalSnNotes);
       } catch (err) {
         Swal.fire("Gagal", err.message, "error");
       }
+    };
+
+    // Helper Function untuk Pilih SN
+    const pickSnForWeapon = async (weaponName, qty) => {
+      const { data: units } = await supabase
+        .from("inventory_weapons")
+        .select("id, serial_number")
+        .eq("weapon_name", weaponName)
+        .eq("status", "available")
+        .is("hold_by", null);
+
+      if (!units || units.length < qty)
+        throw new Error(`Stok SN untuk ${weaponName} tidak cukup!`);
+
+      const { value: selectedSns } = await Swal.fire({
+        title: `Pilih ${qty} SN untuk ${weaponName}`,
+        background: "#2f3136",
+        color: "#fff",
+        html: `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">${units
+          .map(
+            (u) =>
+              `<button class="sn-choice" data-id="${u.id}" data-sn="${u.serial_number}" style="background:#202225; border:1px solid #4f545c; color:#eee; padding:8px; border-radius:6px; cursor:pointer;">${u.serial_number}</button>`
+          )
+          .join("")}</div>`,
+        didOpen: () => {
+          let count = 0;
+          document.querySelectorAll(".sn-choice").forEach((b) => {
+            b.onclick = () => {
+              if (b.classList.toggle("selected")) {
+                if (count < qty) {
+                  b.style.background = "#43b58144";
+                  b.style.borderColor = "#43b581";
+                  count++;
+                } else {
+                  b.classList.remove("selected");
+                }
+              } else {
+                b.style.background = "#202225";
+                b.style.borderColor = "#4f545c";
+                count--;
+              }
+            };
+          });
+        },
+        preConfirm: () => {
+          const sel = document.querySelectorAll(".sn-choice.selected");
+          if (sel.length !== qty)
+            return Swal.showValidationMessage(`Pilih tepat ${qty} SN!`);
+          return Array.from(sel).map((el) => ({
+            id: el.dataset.id,
+            sn: el.dataset.sn,
+          }));
+        },
+      });
+      return selectedSns;
     };
 
     const processItem = async (order, item, status, snNotes = "") => {
@@ -255,22 +303,48 @@ export const OrdersPage = {
 
       try {
         if (status === "approved") {
-          const katalogItem = OrdersPage.state.katalog.find(
-            (k) =>
-              k.nama_barang.trim().toLowerCase() ===
-              item.item_name.trim().toLowerCase()
-          );
-          if (katalogItem && katalogItem.jenis_barang !== "Weapon") {
-            const { data: invData } = await supabase
-              .from("inventory")
-              .select("id, stock")
-              .eq("item_name", item.item_name)
-              .single();
-            if (invData) {
-              await supabase
+          if (item.item_type === "Bundling") {
+            const { data: comps } = await supabase
+              .from("bundle_items")
+              .select("*")
+              .eq("nama_paket", item.item_name);
+            for (const c of comps || []) {
+              const totalPotong = c.jumlah_potong * item.quantity;
+              const kat = OrdersPage.state.katalog.find(
+                (k) => k.nama_barang === c.nama_barang_stok
+              );
+              // Hanya potong tabel inventory jika bukan Weapon (karena Weapon sudah lewat SN status)
+              if (kat?.jenis_barang !== "Weapon") {
+                const { data: inv } = await supabase
+                  .from("inventory")
+                  .select("id, stock")
+                  .eq("item_name", c.nama_barang_stok)
+                  .single();
+                if (inv)
+                  await supabase
+                    .from("inventory")
+                    .update({ stock: inv.stock - totalPotong })
+                    .eq("id", inv.id);
+              }
+            }
+          } else {
+            // SATUAN
+            const katalogItem = OrdersPage.state.katalog.find(
+              (k) =>
+                k.nama_barang.trim().toLowerCase() ===
+                item.item_name.trim().toLowerCase()
+            );
+            if (katalogItem && katalogItem.jenis_barang !== "Weapon") {
+              const { data: invData } = await supabase
                 .from("inventory")
-                .update({ stock: invData.stock - item.quantity })
-                .eq("id", invData.id);
+                .select("id, stock")
+                .eq("item_name", item.item_name)
+                .single();
+              if (invData)
+                await supabase
+                  .from("inventory")
+                  .update({ stock: invData.stock - item.quantity })
+                  .eq("id", invData.id);
             }
           }
         }
@@ -285,7 +359,6 @@ export const OrdersPage = {
           .select("id")
           .eq("order_id", order.id)
           .eq("status", "pending");
-
         if (!remaining || remaining.length === 0) {
           await supabase
             .from("orders")
