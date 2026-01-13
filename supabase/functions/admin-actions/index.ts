@@ -9,7 +9,6 @@ const corsHeaders = {
 };
 
 async function hashPassword(password: string) {
-  // Memastikan password bersih dari spasi sebelum di-hash
   const msgUint8 = new TextEncoder().encode(password.trim());
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -22,10 +21,10 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const token = req.headers.get("x-session-token") ||
       req.headers.get("Authorization")?.replace("Bearer ", "");
@@ -47,7 +46,6 @@ serve(async (req) => {
     const { action, payload } = await req.json();
     const userRole = sessionData.users_login?.role_id;
 
-    // Kecuali ganti password sendiri, harus admin (1 atau 2)
     if (
       action !== "self_change_password" && (userRole !== 1 && userRole !== 2)
     ) {
@@ -55,7 +53,6 @@ serve(async (req) => {
     }
 
     let dbError;
-    // PENTING: Trim password di sini
     const plain_p = (payload.password || "").toString().trim();
 
     if (
@@ -100,42 +97,48 @@ serve(async (req) => {
 
     if (dbError) throw dbError;
 
-    // Notifikasi Discord untuk Admin Action
+    // --- LOGIKA DISCORD ---
     if (
       (action === "create_user" || action === "reset_password") &&
       payload.discord_id
     ) {
-      // Ambil origin dari referer atau gunakan payload app_url
       const origin = req.headers.get("referer")
         ? new URL(req.headers.get("referer")!).origin
-        : "http://localhost:3000"; // Fallback jika tidak ada referer
+        : "http://localhost:3000";
       const portalUrl = payload.app_url || origin;
+
       const messageContent = action === "create_user"
         ? `🆕 **AKUN PORTAL BARU**\n\n👤 Username: \`${payload.username}\`\n🔑 Password: \`${plain_p}\`\n🌐 Link: ${portalUrl}\n\n⚠️ *Segera login dan ganti password Anda.*`
         : `🔄 **RESET PASSWORD PORTAL**\n\n👤 Username: \`${payload.username}\`\n🔑 Password Baru: \`${plain_p}\`\n🌐 Link: ${portalUrl}\n\n⚠️ *Segera login dan ganti kembali password Anda.*`;
 
-      await fetch(
-        `${Deno.env.get("SUPABASE_URL")}/functions/v1/discord-notifier`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${
-              Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-            }`,
-          },
-          body: JSON.stringify({
-            discord_id: payload.discord_id,
-            message: messageContent,
-          }),
+      console.log(
+        `Mengirim notifikasi ke function discord-notifier untuk user: ${payload.username}`,
+      );
+
+      // Memanggil function notifier secara internal
+      fetch(`${supabaseUrl}/functions/v1/discord-notifier`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
         },
-      ).catch((e) => console.error(e));
+        body: JSON.stringify({
+          discord_id: payload.discord_id,
+          message: messageContent,
+        }),
+      })
+        .then(async (res) => {
+          const resText = await res.text();
+          console.log(`Discord Notifier Response (${res.status}): ${resText}`);
+        })
+        .catch((e) => console.error("Discord Fetch Error:", e));
     }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    console.error("Critical Error in admin-actions:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
