@@ -186,28 +186,30 @@ export const UsersPage = {
         preConfirm: async () => {
           const newRoleId = document.getElementById("editRole").value;
 
+          Swal.showLoading();
           // 1. Update Role di tabel users_login
-          const { error } = await supabase
-            .from("users_login")
-            .update({ role_id: parseInt(newRoleId) })
-            .eq("id", targetUser.id);
+          const res = await callAdminAction("update_role", {
+            user_id: targetUser.id,
+            role_id: parseInt(newRoleId),
+            username: targetUser.username, // Untuk audit log di server jika perlu
+          });
 
-          if (!error) {
-            // 2. Hapus semua session user tersebut agar dia "Logout Paksa"
-            // Ini memastikan Rudy tidak bisa pakai token lamanya lagi.
-            await supabase
-              .from("user_sessions")
-              .delete()
-              .eq("user_id", targetUser.id);
-
+          if (res.success) {
             if (window.createAuditLog) {
               await window.createAuditLog(
                 "UPDATE",
                 "users_login",
-                `Mengubah role @${targetUser.username} dan reset session.`
+                `Mengubah role @${targetUser.username} ke ID:${newRoleId} dan reset session.`
               );
             }
             loadUsers();
+            Swal.fire({
+              icon: "success",
+              title: "Role Diperbarui",
+              text: "User telah dipaksa logout untuk menerapkan role baru.",
+              background: "#2f3136",
+              color: "#fff",
+            });
           }
         },
       });
