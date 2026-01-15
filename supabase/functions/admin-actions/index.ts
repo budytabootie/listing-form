@@ -5,10 +5,12 @@ interface SessionResponse {
   user_id: string;
   users_login: {
     role_id: number;
+    username: string; // Tambahkan baris ini
   } | {
     role_id: number;
-  }[]; // Menangani kemungkinan object tunggal atau array
-}
+    username: string; // Tambahkan baris ini juga
+  }[];
+} // Menangani kemungkinan object tunggal atau array
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,6 +47,7 @@ serve(async (req) => {
         user_id,
         users_login!user_id (
           role_id
+          username
         )
       `)
       .eq("token", token)
@@ -54,15 +57,30 @@ serve(async (req) => {
 
     const { action, payload } = await req.json();
     // Ambil role_id dengan aman baik jika dia array maupun object
+    // Ambil role & username dari session
     const loginData = sessionData.users_login;
     const userRole = Array.isArray(loginData)
       ? loginData[0]?.role_id
       : loginData?.role_id;
+    const sessionUsername = Array.isArray(loginData)
+      ? loginData[0]?.username
+      : loginData?.username;
 
+    // 2. Proteksi Role: Hanya admin (1/2) yang bisa akses selain ganti password sendiri
     if (
       action !== "self_change_password" && (userRole !== 1 && userRole !== 2)
     ) {
-      throw new Error("Unauthorized");
+      throw new Error("Anda tidak memiliki izin (Unauthorized)");
+    }
+
+    // 3. Tambahan Proteksi Keamanan: Jika ganti password sendiri, pastikan ID-nya cocok
+    if (
+      action === "self_change_password" &&
+      payload.user_id !== sessionData.user_id
+    ) {
+      throw new Error(
+        "Akses ditolak: Anda tidak bisa mengubah password user lain",
+      );
     }
 
     let dbError;
@@ -79,14 +97,6 @@ serve(async (req) => {
       );
 
       if (action === "create_user") {
-        // Fallback: Cari discord_id jika tidak dikirim dari frontend
-        if (!payload.discord_id) {
-          const { data: m } = await supabase.from("members").select(
-            "discord_id",
-          ).eq("nama", payload.nama_lengkap).single();
-          if (m) payload.discord_id = m.discord_id;
-        }
-
         const { error } = await supabase.from("users_login").insert([{
           nama_lengkap: payload.nama_lengkap,
           username: payload.username,
@@ -97,16 +107,6 @@ serve(async (req) => {
         }]);
         dbError = error;
       } else if (action === "reset_password") {
-        const { data: memberData } = await supabase
-          .from("members")
-          .select("discord_id")
-          .eq("nama", payload.nama_lengkap)
-          .single();
-
-        if (memberData?.discord_id) {
-          payload.discord_id = memberData.discord_id;
-        }
-
         const { error } = await supabase.from("users_login").update({
           password: hashed_p,
           is_encrypted: true,
@@ -117,24 +117,18 @@ serve(async (req) => {
         const { error } = await supabase.from("users_login").update({
           password: hashed_p,
           is_encrypted: true,
-          has_changed_password: true,
+          has_changed_password: true, // Flag berubah jadi true
         }).eq("id", payload.user_id);
         dbError = error;
       }
     } else if (action === "update_role") {
-      // 1. Update Role User
-      const { error } = await supabase
-        .from("users_login")
-        .update({ role_id: payload.role_id })
-        .eq("id", payload.user_id);
-
-      // 2. Paksa Logout (Hapus semua sesi aktif user tersebut)
-      // Ini penting agar token lama dengan role lama tidak bisa dipakai lagi
-      await supabase
-        .from("user_sessions")
-        .delete()
-        .eq("user_id", payload.user_id);
-
+      const { error } = await supabase.from("users_login").update({
+        role_id: payload.role_id,
+      }).eq("id", payload.user_id);
+      await supabase.from("user_sessions").delete().eq(
+        "user_id",
+        payload.user_id,
+      );
       dbError = error;
     } else if (action === "delete_user") {
       const { error } = await supabase.from("users_login").delete().eq(

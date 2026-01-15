@@ -5,7 +5,7 @@ import { createClient } from "supabase";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-session-token",
+    "authorization, x-client-info, apikey, content-type, x-custom-auth, x-session-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { items, userId, token } = await req.json();
+    const { items, token } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -28,6 +28,7 @@ serve(async (req) => {
       .from("user_sessions")
       .select("user_id")
       .eq("token", token)
+      .gt("expires_at", new Date().toISOString())
       .maybeSingle();
 
     if (sessionError || !session) {

@@ -113,6 +113,19 @@ export const AdminProfile = {
         if (newPass !== confirmPass)
           return Swal.fire("Error", "Password tidak cocok", "error");
 
+        Swal.fire({
+          title: "Memproses...",
+          background: "#2f3136",
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+
+        // GUNAKAN FUNGSI API (Satu pintu ke admin-actions)
+        // Pastikan file API sudah di-import di atas (import { API } from '../api.js')
+        const result = await API.updatePassword(userId, newPass);
+
         // PROSES ENKRIPSI SHA256
         const hashedNewPass = CryptoJS.SHA256(newPass).toString();
 

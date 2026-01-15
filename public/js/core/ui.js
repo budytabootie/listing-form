@@ -58,7 +58,8 @@ export const PortalUI = {
           },
         });
 
-        const result = await API.updatePassword(userData.id, "", newPass);
+        // Cukup kirim ID dan Password Baru
+        const result = await API.updatePassword(userData.id, newPass);
         if (result.success) {
           Swal.fire({
             icon: "success",
@@ -140,7 +141,7 @@ export const PortalUI = {
         },
       });
 
-      const result = await API.updatePassword(userData.id, "", newPass);
+      const result = await API.updatePassword(userData.id, newPass);
 
       if (result.success) {
         await Swal.fire({

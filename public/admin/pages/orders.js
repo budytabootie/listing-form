@@ -90,10 +90,8 @@ export const OrdersPage = {
               const stockItem = OrdersPage.state.inventory.find(
                 (i) => i.item_name === item.item_name
               );
-
               const isBundling = item.item_type === "Bundling";
               const stockExist = stockItem ? stockItem.stock : 0;
-              // Jika bundling, bypass check stock low agar tombol tidak mati (stok dicek saat klik approve)
               const isStockLow = isBundling
                 ? false
                 : stockExist < item.quantity;
@@ -109,33 +107,39 @@ export const OrdersPage = {
               const typeColor = categoryColors[safeType] || "#72767d";
 
               return `
-              <div style="background:#18191c; margin-top:10px; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; border-left: 4px solid ${typeColor};">
-                <div>
-                  <div style="font-size:0.65rem; color:${typeColor}; font-weight:bold; text-transform:uppercase; margin-bottom:4px;">${safeType}</div>
-                  <div style="color:#fff; font-weight:bold;">${
-                    item.item_name
-                  } <span style="color:#43b581;">x${item.quantity}</span></div>
-                  <div style="font-size:0.75rem; color:${
-                    isStockLow ? "#f04747" : "#b9bbbe"
-                  };">${
-                isBundling ? "Paket Bundling" : "Gudang: " + stockExist
-              }</div>
-                </div>
-                <div style="display:flex; gap:10px;">
-                  <button class="btn-item-action" data-item-id="${
-                    item.id
-                  }" data-order-id="${order.id}" data-action="approved" 
-                    ${
-                      isStockLow
-                        ? 'disabled style="background:#4f545c; opacity:0.5;"'
-                        : 'style="background:#43b581; cursor:pointer;"'
-                    }>APPROVE</button>
-                  <button class="btn-item-action" data-item-id="${
-                    item.id
-                  }" data-order-id="${order.id}" data-action="rejected" 
-                    style="background:#ed4245; cursor:pointer;">REJECT</button>
-                </div>
-              </div>`;
+                <div style="background:#18191c; margin-top:10px; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; border-left: 4px solid ${typeColor};">
+                  <div>
+                    <div style="font-size:0.65rem; color:${typeColor}; font-weight:bold; text-transform:uppercase; margin-bottom:4px;">${safeType}</div>
+                    <div style="color:#fff; font-weight:bold;">${
+                      item.item_name
+                    } <span style="color:#43b581;">x${
+                item.quantity
+              }</span></div>
+                    <div style="font-size:0.75rem; color:${
+                      isStockLow ? "#f04747" : "#b9bbbe"
+                    };">
+                      ${isBundling ? "Paket Bundling" : "Gudang: " + stockExist}
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:10px;">
+                    <button class="btn-item-action" data-item-id="${
+                      item.id
+                    }" data-order-id="${order.id}" data-action="approved" 
+                      ${
+                        isStockLow
+                          ? 'disabled style="background:#4f545c; opacity:0.5;"'
+                          : 'style="background:#43b581; cursor:pointer;"'
+                      }>
+                      APPROVE
+                    </button>
+                    <button class="btn-item-action" data-item-id="${
+                      item.id
+                    }" data-order-id="${order.id}" data-action="rejected" 
+                      style="background:#ed4245; cursor:pointer;">
+                      REJECT
+                    </button>
+                  </div>
+                </div>`;
             })
             .join("");
 
@@ -179,9 +183,8 @@ export const OrdersPage = {
 
       try {
         let finalSnNotes = "";
-        let selectedWeaponData = []; // Untuk menyimpan ID SN yang akan di-update
+        let selectedWeaponData = [];
 
-        // LOGIKA PENGECEKAN BUNDLING VS SATUAN
         if (item.item_type === "Bundling") {
           const { data: components, error: bErr } = await supabase
             .from("bundle_items")
@@ -191,7 +194,6 @@ export const OrdersPage = {
           if (bErr || !components || components.length === 0)
             throw new Error("Komponen bundling tidak ditemukan!");
 
-          // Iterasi setiap komponen dalam bundling
           for (const comp of components) {
             const katalogComp = OrdersPage.state.katalog.find(
               (k) => k.nama_barang === comp.nama_barang_stok
@@ -203,7 +205,7 @@ export const OrdersPage = {
                 comp.nama_barang_stok,
                 totalQtyNeeded
               );
-              if (!sns) return; // User cancel
+              if (!sns) return;
 
               finalSnNotes += `${comp.nama_barang_stok}: ${sns
                 .map((s) => s.sn)
@@ -212,7 +214,6 @@ export const OrdersPage = {
             }
           }
         } else {
-          // LOGIKA SATUAN LAMA
           const katalogItem = OrdersPage.state.katalog.find(
             (k) => k.nama_barang === item.item_name
           );
@@ -224,21 +225,19 @@ export const OrdersPage = {
           }
         }
 
-        // Jika ada senjata (baik satuan/bundling), update status SN
-        if (selectedWeaponData.length > 0) {
-          await supabase
-            .from("inventory_weapons")
-            .update({ status: "in_use", hold_by: order.requested_by })
-            .in("id", selectedWeaponData);
-        }
-
-        await processItem(order, item, "approved", finalSnNotes);
+        // Proses approve (Satuan maupun Bundling)
+        await processItem(
+          order,
+          item,
+          "approved",
+          finalSnNotes,
+          selectedWeaponData
+        );
       } catch (err) {
         Swal.fire("Gagal", err.message, "error");
       }
     };
 
-    // Helper Function untuk Pilih SN
     const pickSnForWeapon = async (weaponName, qty) => {
       const { data: units } = await supabase
         .from("inventory_weapons")
@@ -293,7 +292,13 @@ export const OrdersPage = {
       return selectedSns;
     };
 
-    const processItem = async (order, item, status, snNotes = "") => {
+    const processItem = async (
+      order,
+      item,
+      status,
+      snNotes = "",
+      selectedWeaponIds = []
+    ) => {
       OrdersPage.state.isProcessing = true;
       Swal.fire({
         title: "Processing...",
@@ -313,61 +318,54 @@ export const OrdersPage = {
               const kat = OrdersPage.state.katalog.find(
                 (k) => k.nama_barang === c.nama_barang_stok
               );
-              // Hanya potong tabel inventory jika bukan Weapon (karena Weapon sudah lewat SN status)
-              if (kat?.jenis_barang !== "Weapon") {
-                const { data: inv } = await supabase
-                  .from("inventory")
-                  .select("id, stock")
-                  .eq("item_name", c.nama_barang_stok)
-                  .single();
-                if (inv)
-                  await supabase
-                    .from("inventory")
-                    .update({ stock: inv.stock - totalPotong })
-                    .eq("id", inv.id);
-              }
+              const isWeapon = kat?.jenis_barang === "Weapon";
+
+              const { error: rpcError } = await supabase.rpc(
+                "approve_order_item",
+                {
+                  p_item_id: item.id,
+                  p_order_id: order.id,
+                  p_item_name: c.nama_barang_stok,
+                  p_qty: totalPotong,
+                  p_is_weapon: isWeapon,
+                  p_weapon_ids: isWeapon ? selectedWeaponIds : [],
+                  p_sn_notes: snNotes,
+                  p_admin_name: userData.nama_lengkap,
+                }
+              );
+              if (rpcError)
+                throw new Error(
+                  `Bundling Error (${c.nama_barang_stok}): ${rpcError.message}`
+                );
             }
           } else {
-            // SATUAN
             const katalogItem = OrdersPage.state.katalog.find(
               (k) =>
                 k.nama_barang.trim().toLowerCase() ===
                 item.item_name.trim().toLowerCase()
             );
-            if (katalogItem && katalogItem.jenis_barang !== "Weapon") {
-              const { data: invData } = await supabase
-                .from("inventory")
-                .select("id, stock")
-                .eq("item_name", item.item_name)
-                .single();
-              if (invData)
-                await supabase
-                  .from("inventory")
-                  .update({ stock: invData.stock - item.quantity })
-                  .eq("id", invData.id);
-            }
+            const isWeapon = katalogItem?.jenis_barang === "Weapon";
+
+            const { error: rpcError } = await supabase.rpc(
+              "approve_order_item",
+              {
+                p_item_id: item.id,
+                p_order_id: order.id,
+                p_item_name: item.item_name,
+                p_qty: item.quantity,
+                p_is_weapon: isWeapon,
+                p_weapon_ids: selectedWeaponIds,
+                p_sn_notes: snNotes,
+                p_admin_name: userData.nama_lengkap,
+              }
+            );
+            if (rpcError) throw new Error(rpcError.message);
           }
-        }
-
-        await supabase
-          .from("order_items")
-          .update({ status: status, sn_list: snNotes })
-          .eq("id", item.id);
-
-        const { data: remaining } = await supabase
-          .from("order_items")
-          .select("id")
-          .eq("order_id", order.id)
-          .eq("status", "pending");
-        if (!remaining || remaining.length === 0) {
+        } else {
           await supabase
-            .from("orders")
-            .update({
-              status: "processed",
-              processed_at: new Date().toISOString(),
-              processed_by_name: userData.nama_lengkap,
-            })
-            .eq("id", order.id);
+            .from("order_items")
+            .update({ status: "rejected" })
+            .eq("id", item.id);
         }
 
         // Audit Log

@@ -61,12 +61,12 @@ export const API = {
   async updatePassword(userId, oldPasswordPlain = "", newPasswordPlain = "") {
     try {
       const token = localStorage.getItem("sessionToken");
-      const sessionRaw = localStorage.getItem("nmc_session");
-      const session = sessionRaw ? JSON.parse(sessionRaw) : {};
 
-      if (!token) throw new Error("Token tidak ditemukan di storage");
+      if (!token)
+        throw new Error("Sesi telah berakhir, silakan login kembali.");
+      if (!newPasswordPlain)
+        throw new Error("Password baru tidak boleh kosong");
 
-      const finalPassword = newPasswordPlain || oldPasswordPlain;
       if (!finalPassword) throw new Error("Password tidak boleh kosong");
 
       const response = await fetch(`${this._functionUrl}/admin-actions`, {
@@ -74,25 +74,22 @@ export const API = {
         headers: {
           "Content-Type": "application/json",
           apikey: this._supabase.supabaseKey,
-          // PERBAIKAN: Gunakan API Key untuk Authorization (untuk Gateway)
-          Authorization: `Bearer ${this._supabase.supabaseKey}`,
-          // Gunakan x-session-token untuk Session User (untuk Logika Deno)
-          "x-session-token": token,
+          Authorization: `Bearer ${this._supabase.supabaseKey}`, // Untuk gateway Supabase
+          "x-session-token": token, // Untuk divalidasi oleh Deno (admin-actions)
         },
         body: JSON.stringify({
           action: "self_change_password",
           payload: {
             user_id: userId,
-            password: finalPassword.toString().trim(),
-            nama_lengkap: session.nama_lengkap || session.nama || "User",
+            password: newPasswordPlain.toString().trim(),
           },
         }),
       });
 
       const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Server menolak permintaan");
-
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal memperbarui password");
+      }
       return { success: true };
     } catch (err) {
       console.error("DETEKSI ERROR:", err.message);
