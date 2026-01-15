@@ -5,12 +5,8 @@ interface SessionResponse {
   user_id: string;
   users_login: {
     role_id: number;
-    username: string; // Tambahkan baris ini
-  } | {
-    role_id: number;
-    username: string; // Tambahkan baris ini juga
-  }[];
-} // Menangani kemungkinan object tunggal atau array
+  };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,43 +36,44 @@ serve(async (req) => {
       req.headers.get("Authorization")?.replace("Bearer ", "");
     if (!token) throw new Error("No session token provided");
 
-    // Gunakan 'as any' pada sessionData untuk melewati pengecekan array relasi
+    // 1. Ambil data session dan join ke users_login
     const { data: sessionData, error: authError } = await supabase
       .from("user_sessions")
       .select(`
         user_id,
-        users_login!user_id (
+        users_login (
           role_id
-          username
         )
       `)
       .eq("token", token)
-      .single() as { data: SessionResponse | null; error: Error | null };
+      .maybeSingle();
 
-    if (authError || !sessionData) throw new Error("Invalid Session");
+    if (authError || !sessionData || !sessionData.users_login) {
+      throw new Error(
+        "Invalid Session: Sesi tidak ditemukan atau user tidak valid",
+      );
+    }
+
+    // 2. Casting ke interface agar TypeScript tidak error 'never'
+    const typedSession = sessionData as unknown as SessionResponse;
+    const userRole = typedSession.users_login.role_id;
+    const sessionUserId = typedSession.user_id;
 
     const { action, payload } = await req.json();
     // Ambil role_id dengan aman baik jika dia array maupun object
     // Ambil role & username dari session
     const loginData = sessionData.users_login;
-    const userRole = Array.isArray(loginData)
-      ? loginData[0]?.role_id
-      : loginData?.role_id;
-    const sessionUsername = Array.isArray(loginData)
-      ? loginData[0]?.username
-      : loginData?.username;
 
-    // 2. Proteksi Role: Hanya admin (1/2) yang bisa akses selain ganti password sendiri
+    // 3. Proteksi Role: Hanya admin (1/2) yang bisa akses selain ganti password sendiri
     if (
       action !== "self_change_password" && (userRole !== 1 && userRole !== 2)
     ) {
       throw new Error("Anda tidak memiliki izin (Unauthorized)");
     }
 
-    // 3. Tambahan Proteksi Keamanan: Jika ganti password sendiri, pastikan ID-nya cocok
+    // 4. Proteksi Keamanan: Jika ganti password sendiri, pastikan ID cocok
     if (
-      action === "self_change_password" &&
-      payload.user_id !== sessionData.user_id
+      action === "self_change_password" && payload.user_id !== sessionUserId
     ) {
       throw new Error(
         "Akses ditolak: Anda tidak bisa mengubah password user lain",

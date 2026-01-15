@@ -21,6 +21,28 @@ export const OrdersPage = {
     const container = document.getElementById("ordersListContainer");
     if (!container) return;
 
+    // --- HELPER: UPDATE HARGA TOTAL ORDER SETELAH REJECT ---
+    const updateOrderTotal = async (orderId) => {
+      const { data: items } = await supabase
+        .from("order_items")
+        .select("price, quantity")
+        .eq("order_id", orderId)
+        .neq("status", "rejected");
+
+      const newTotal = (items || []).reduce((sum, i) => {
+        const priceNum =
+          typeof i.price === "string"
+            ? parseInt(i.price.replace(/[^\d]/g, ""))
+            : i.price || 0;
+        return sum + priceNum * i.quantity;
+      }, 0);
+
+      await supabase
+        .from("orders")
+        .update({ total_price: `$ ${newTotal.toLocaleString("en-US")}` })
+        .eq("id", orderId);
+    };
+
     const loadOrders = async () => {
       const currentContainer = document.getElementById("ordersListContainer");
       if (!currentContainer) return;
@@ -185,28 +207,25 @@ export const OrdersPage = {
         let finalSnNotes = "";
         let selectedWeaponData = [];
 
+        // --- HANDLING SN UNTUK APPROVE ---
         if (item.item_type === "Bundling") {
-          const { data: components, error: bErr } = await supabase
+          const { data: components } = await supabase
             .from("bundle_items")
             .select("nama_barang_stok, jumlah_potong")
             .eq("nama_paket", item.item_name);
-
-          if (bErr || !components || components.length === 0)
+          if (!components || components.length === 0)
             throw new Error("Komponen bundling tidak ditemukan!");
 
           for (const comp of components) {
             const katalogComp = OrdersPage.state.katalog.find(
               (k) => k.nama_barang === comp.nama_barang_stok
             );
-            const totalQtyNeeded = comp.jumlah_potong * item.quantity;
-
             if (katalogComp?.jenis_barang === "Weapon") {
               const sns = await pickSnForWeapon(
                 comp.nama_barang_stok,
-                totalQtyNeeded
+                comp.jumlah_potong * item.quantity
               );
               if (!sns) return;
-
               finalSnNotes += `${comp.nama_barang_stok}: ${sns
                 .map((s) => s.sn)
                 .join(", ")} | `;
@@ -225,7 +244,7 @@ export const OrdersPage = {
           }
         }
 
-        // Proses approve (Satuan maupun Bundling)
+        // Jalankan proses approve dengan data SN yang sudah dikumpulkan
         await processItem(
           order,
           item,
@@ -245,7 +264,6 @@ export const OrdersPage = {
         .eq("weapon_name", weaponName)
         .eq("status", "available")
         .is("hold_by", null);
-
       if (!units || units.length < qty)
         throw new Error(`Stok SN untuk ${weaponName} tidak cukup!`);
 
@@ -308,84 +326,62 @@ export const OrdersPage = {
 
       try {
         if (status === "approved") {
+          // --- LOGIKA APPROVE ---
+
+          const kat = OrdersPage.state.katalog.find(
+            (k) => k.nama_barang === item.item_name
+          );
+          const { error } = await supabase.rpc("approve_order_item", {
+            p_item_id: item.id,
+            p_order_id: order.id,
+            p_item_name: item.item_name,
+            p_qty: item.quantity,
+            p_is_weapon: kat?.jenis_barang === "Weapon",
+            p_weapon_ids: selectedWeaponIds,
+            p_sn_notes: snNotes,
+            p_admin_name: userData.nama_lengkap,
+          });
+          if (error) throw error;
+        } else {
+          // --- LOGIKA REJECT: KEMBALIKAN STOK ---
           if (item.item_type === "Bundling") {
             const { data: comps } = await supabase
               .from("bundle_items")
               .select("*")
               .eq("nama_paket", item.item_name);
             for (const c of comps || []) {
-              const totalPotong = c.jumlah_potong * item.quantity;
-              const kat = OrdersPage.state.katalog.find(
-                (k) => k.nama_barang === c.nama_barang_stok
-              );
-              const isWeapon = kat?.jenis_barang === "Weapon";
-
-              const { error: rpcError } = await supabase.rpc(
-                "approve_order_item",
-                {
-                  p_item_id: item.id,
-                  p_order_id: order.id,
-                  p_item_name: c.nama_barang_stok,
-                  p_qty: totalPotong,
-                  p_is_weapon: isWeapon,
-                  p_weapon_ids: isWeapon ? selectedWeaponIds : [],
-                  p_sn_notes: snNotes,
-                  p_admin_name: userData.nama_lengkap,
-                }
-              );
-              if (rpcError)
-                throw new Error(
-                  `Bundling Error (${c.nama_barang_stok}): ${rpcError.message}`
-                );
+              await supabase.rpc("increment_inventory", {
+                i_name: c.nama_barang_stok,
+                i_qty: c.jumlah_potong * item.quantity,
+              });
             }
           } else {
-            const katalogItem = OrdersPage.state.katalog.find(
-              (k) =>
-                k.nama_barang.trim().toLowerCase() ===
-                item.item_name.trim().toLowerCase()
-            );
-            const isWeapon = katalogItem?.jenis_barang === "Weapon";
-
-            const { error: rpcError } = await supabase.rpc(
-              "approve_order_item",
-              {
-                p_item_id: item.id,
-                p_order_id: order.id,
-                p_item_name: item.item_name,
-                p_qty: item.quantity,
-                p_is_weapon: isWeapon,
-                p_weapon_ids: selectedWeaponIds,
-                p_sn_notes: snNotes,
-                p_admin_name: userData.nama_lengkap,
-              }
-            );
-            if (rpcError) throw new Error(rpcError.message);
+            await supabase.rpc("increment_inventory", {
+              i_name: item.item_name,
+              i_qty: item.quantity,
+            });
           }
-        } else {
           await supabase
             .from("order_items")
             .update({ status: "rejected" })
             .eq("id", item.id);
+          await updateOrderTotal(order.id);
         }
 
-        // Audit Log
-        try {
-          await supabase.functions.invoke("admin-actions", {
-            body: {
-              action: "create_audit_log",
-              log_data: {
-                action_type: status.toUpperCase(),
-                target_table: "order_items",
-                details: `${status.toUpperCase()} ${item.item_name} (x${
-                  item.quantity
-                }) untuk ${order.requested_by}`,
-                admin_name: userData.nama_lengkap,
-              },
+        // --- AUDIT LOG & FINISH ---
+        await supabase.functions.invoke("admin-actions", {
+          body: {
+            action: "create_audit_log",
+            log_data: {
+              action_type: status.toUpperCase(),
+              target_table: "order_items",
+              details: `${status.toUpperCase()} ${item.item_name} (x${
+                item.quantity
+              }) untuk ${order.requested_by}`,
+              admin_name: userData.nama_lengkap,
             },
-          });
-        } catch (e) {
-          console.warn("Audit log fail");
-        }
+          },
+        });
 
         Swal.fire({
           icon: "success",
@@ -394,7 +390,7 @@ export const OrdersPage = {
           showConfirmButton: false,
         });
       } catch (error) {
-        Swal.fire("Error", error.message || "Gagal memproses item", "error");
+        Swal.fire("Error", error.message || "Gagal memproses", "error");
       } finally {
         await loadOrders();
         OrdersPage.state.isProcessing = false;

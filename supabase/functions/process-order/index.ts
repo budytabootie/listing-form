@@ -42,12 +42,11 @@ serve(async (req) => {
     for (const item of items) {
       const { error: rpcError } = await supabaseAdmin.rpc(
         "decrement_inventory",
-        {
-          i_name: item.nama,
-          i_qty: item.qty,
-        },
+        { i_name: item.nama, i_qty: item.qty },
       );
-      if (rpcError) throw rpcError;
+
+      // Jika RPC melempar RAISE EXCEPTION dari SQL, error-nya akan tertangkap di sini
+      if (rpcError) throw new Error(rpcError.message);
     }
 
     return new Response(JSON.stringify({ success: true }), {
