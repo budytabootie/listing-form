@@ -67,8 +67,6 @@ export const API = {
       if (!newPasswordPlain)
         throw new Error("Password baru tidak boleh kosong");
 
-      if (!finalPassword) throw new Error("Password tidak boleh kosong");
-
       const response = await fetch(`${this._functionUrl}/admin-actions`, {
         method: "POST",
         headers: {
