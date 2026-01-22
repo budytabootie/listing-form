@@ -83,6 +83,18 @@ serve(async (req) => {
     let dbError;
     const plain_p = (payload.password || "").toString().trim();
 
+    // --- LOGIKA BARU: CREATE AUDIT LOG ---
+    if (action === "create_audit_log") {
+      const { log_data } = payload;
+      const { error } = await supabase.from("audit_logs").insert([{
+        action_type: log_data.action_type,
+        target_table: log_data.target_table,
+        details: log_data.details,
+        admin_name: log_data.admin_name,
+      }]);
+      dbError = error;
+    }
+
     if (
       ["create_user", "reset_password", "self_change_password"].includes(action)
     ) {

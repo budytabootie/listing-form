@@ -25,7 +25,7 @@ export const AdminDashboard = {
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
         <div style="background: #2f3136; padding: 20px; border-radius: 12px; border-left: 4px solid #43b581;">
             <div style="color: #b9bbbe; font-size: 0.75rem; font-weight: bold;">PENDAPATAN (PERIODE)</div>
-            <div id="revenueVal" style="font-size: 1.5rem; color: #fff; font-weight: bold; margin-top: 5px;">$0</div>
+            <div id="revenueVal" style="font-size: 1.5rem; color: #fff; font-weight: bold; margin-top: 5px;">$ 0</div>
         </div>
         <div style="background: #2f3136; padding: 20px; border-radius: 12px; border-left: 4px solid #5865f2;">
             <div style="color: #b9bbbe; font-size: 0.75rem; font-weight: bold;">TOTAL TRANSAKSI</div>
@@ -56,70 +56,95 @@ export const AdminDashboard = {
   init: async (supabase) => {
     const st = AdminDashboard.state;
 
+    // Helper: Fungsi Animasi Angka
+    const animateValue = (id, value, prefix = "") => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      let start = 0;
+      const duration = 1000;
+      const step = Math.ceil(value / (duration / 16));
+      const timer = setInterval(() => {
+        start += step;
+        if (start >= value) {
+          el.innerText = prefix + value.toLocaleString();
+          clearInterval(timer);
+        } else {
+          el.innerText = prefix + start.toLocaleString();
+        }
+      }, 16);
+    };
+
     const loadData = async () => {
       st.chartInstances.forEach((chart) => chart.destroy());
       st.chartInstances = [];
 
-      let query = supabase.from("orders").select("*").eq("status", "approved");
+      // Query database: Ambil order_items dan join dengan orders untuk filter status
+      let query = supabase.from("order_items").select(`
+                *,
+                orders (requested_by, status, processed_at, created_at)
+            `);
 
-      // Terapkan filter waktu jika bukan "all"
+      // Filter Waktu berdasarkan created_at di tabel order_items
       if (st.timeFilter !== "all") {
         const days = parseInt(st.timeFilter);
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
-        query = query.gte("processed_at", startDate.toISOString());
+        query = query.gte("created_at", startDate.toISOString());
       }
 
-      const { data: orders, error } = await query;
+      const { data: items, error } = await query;
+      if (error) return console.error("Dashboard Error:", error);
 
-      if (error) {
-        console.error("Error fetch dashboard:", error);
-        return;
-      }
-
-      let totalRev = 0,
-        totalItems = 0;
+      let metrics = {
+        revenue: 0,
+        itemsOut: 0,
+        totalOrders: new Set(),
+      };
       const itemStats = {};
       const categoryStats = {};
       const memberStats = {};
 
-      if (orders) {
-        orders.forEach((o) => {
-          // PERBAIKAN: Robust Price Parsing (Sama dengan History)
-          const price =
-            typeof o.total_price === "string"
-              ? parseFloat(o.total_price.replace(/[^-0-9.]/g, ""))
-              : o.total_price;
+      if (items) {
+        items.forEach((item) => {
+          // Hanya hitung jika status order (bukan status item) adalah approved/processed/success
+          const orderStatus = item.orders?.status?.toLowerCase() || "";
 
-          const qty = o.quantity || 0;
+          if (["approved", "processed", "success"].includes(orderStatus)) {
+            // Catat ID Order yang unik
+            if (item.order_id) metrics.totalOrders.add(item.order_id);
 
-          totalRev += price || 0;
-          totalItems += qty;
+            // Perhitungan Revenue & Qty
+            const price = Number(item.price) || 0;
+            const qty = Number(item.quantity) || 1;
 
-          itemStats[o.item_name] = (itemStats[o.item_name] || 0) + qty;
-          memberStats[o.requested_by] = (memberStats[o.requested_by] || 0) + 1;
+            metrics.revenue += price;
+            metrics.itemsOut += qty;
 
-          // PERBAIKAN: Tipe Barang Dinamis & Bersih
-          let type = o.item_type || "Uncategorized";
-          if (type === "General") type = "Lain-lain"; // Mapping manual jika perlu
-          categoryStats[type] = (categoryStats[type] || 0) + qty;
+            // Stats Item & Kategori
+            const name = item.item_name || "Unknown";
+            itemStats[name] = (itemStats[name] || 0) + qty;
+
+            const type = item.item_type || "Lain-lain";
+            categoryStats[type] = (categoryStats[type] || 0) + qty;
+
+            // Stats Member
+            const req = item.orders?.requested_by || "Unknown";
+            memberStats[req] = (memberStats[req] || 0) + 1;
+          }
         });
       }
 
+      // Update UI
+      animateValue("revenueVal", metrics.revenue, "$ ");
+      document.getElementById("ordersVal").innerText = metrics.totalOrders.size;
+      document.getElementById("itemsVal").innerText = metrics.itemsOut;
+
       const topMember = Object.entries(memberStats).sort(
-        (a, b) => b[1] - a[1]
+        (a, b) => b[1] - a[1],
       )[0];
-
-      const revEl = document.getElementById("revenueVal");
-      const ordEl = document.getElementById("ordersVal");
-      const itmEl = document.getElementById("itemsVal");
-      const topMemEl = document.getElementById("topMemberVal");
-
-      // Gunakan toLocaleString agar format ribuan rapi
-      if (revEl) revEl.innerText = `$${Math.floor(totalRev).toLocaleString()}`;
-      if (ordEl) ordEl.innerText = orders ? orders.length : 0;
-      if (itmEl) itmEl.innerText = totalItems;
-      if (topMemEl) topMemEl.innerText = topMember ? topMember[0] : "-";
+      document.getElementById("topMemberVal").innerText = topMember
+        ? topMember[0]
+        : "-";
 
       renderCharts(itemStats, categoryStats);
     };
@@ -129,18 +154,18 @@ export const AdminDashboard = {
       const canvasPie = document.getElementById("categoryChart");
       if (!canvasBar || !canvasPie) return;
 
-      const sorted = Object.entries(itemStats)
+      const sortedItems = Object.entries(itemStats)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
 
       const barChart = new Chart(canvasBar.getContext("2d"), {
         type: "bar",
         data: {
-          labels: sorted.map((x) => x[0]),
+          labels: sortedItems.map((x) => x[0]),
           datasets: [
             {
-              label: "Terjual",
-              data: sorted.map((x) => x[1]),
+              label: "Unit",
+              data: sortedItems.map((x) => x[1]),
               backgroundColor: "#5865f2",
               borderRadius: 5,
             },
@@ -194,9 +219,10 @@ export const AdminDashboard = {
       st.chartInstances.push(barChart, pieChart);
     };
 
+    // Filter Event Listener
     const filterEl = document.getElementById("dashboardTimeFilter");
     if (filterEl) {
-      filterEl.value = st.timeFilter; // Pastikan select sesuai state
+      filterEl.value = st.timeFilter;
       filterEl.onchange = (e) => {
         st.timeFilter = e.target.value;
         loadData();

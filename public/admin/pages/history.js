@@ -63,23 +63,24 @@ export const HistoryPage = {
     const calculateRevenue = (data) => {
       const revenue = data
         .filter((h) =>
-          ["approved", "processed", "success"].includes(h.status?.toLowerCase())
+          ["approved", "processed", "success"].includes(
+            h.status?.toLowerCase(),
+          ),
         )
         .reduce((sum, h) => {
-          let price = 0;
-          if (typeof h.total_price === "string") {
-            // Bersihkan format $ dan koma
-            const cleanNumber = h.total_price.replace(/[^\d]/g, "");
-            price = parseInt(cleanNumber) || 0;
-          } else {
-            price = h.total_price || 0;
-          }
-          return sum + price;
+          // Menghitung total dengan menjumlahkan 'price' dari array order_items
+          // Ini jauh lebih akurat daripada mengambil teks total_price
+          const itemTotal =
+            h.order_items?.reduce(
+              (s, item) => s + (Number(item.price) || 0),
+              0,
+            ) || 0;
+
+          return sum + itemTotal;
         }, 0);
 
-      document.getElementById(
-        "totalRevenue"
-      ).innerText = `$ ${revenue.toLocaleString("en-US")}`;
+      const el = document.getElementById("totalRevenue");
+      if (el) el.innerText = `$ ${revenue.toLocaleString("en-US")}`;
     };
 
     const refreshUI = () => {
@@ -89,7 +90,7 @@ export const HistoryPage = {
           h.requested_by?.toLowerCase().includes(search) ||
           h.item_name?.toLowerCase().includes(search) ||
           h.order_items?.some((item) =>
-            item.item_name.toLowerCase().includes(search)
+            item.item_name.toLowerCase().includes(search),
           )
         );
       });
@@ -97,7 +98,7 @@ export const HistoryPage = {
       const totalPages = Math.ceil(filtered.length / st.itemsPerPage) || 1;
       const paginatedData = filtered.slice(
         (st.currentPage - 1) * st.itemsPerPage,
-        st.currentPage * st.itemsPerPage
+        st.currentPage * st.itemsPerPage,
       );
 
       renderTable(paginatedData);
@@ -203,7 +204,7 @@ export const HistoryPage = {
           }; text-transform:uppercase; margin-top:5px; font-weight:bold;">
             Status: ${item.status}
           </div>
-        </div>`
+        </div>`,
         )
         .join("");
 

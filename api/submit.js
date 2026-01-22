@@ -3,7 +3,7 @@ const { createClient } = require("@supabase/supabase-js");
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 );
 
 module.exports = async (req, res) => {
@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
       .insert([
         {
           requested_by: nama,
-          total_price: totalHarga,
+          total_price: parseInt(totalHarga.replace(/[^\d]/g, "")) || 0,
           status: "pending",
           rank: finalRank,
           created_at: new Date().toISOString(),
@@ -48,8 +48,8 @@ module.exports = async (req, res) => {
             items.length > 1
               ? "MULTI ITEMS"
               : items[0].kategori === "Bundling"
-              ? "Bundling"
-              : items[0].kategori || "General",
+                ? "Bundling"
+                : items[0].kategori || "General",
           quantity: items.reduce((sum, i) => sum + (i.qty || 1), 0),
         },
       ])
@@ -59,19 +59,25 @@ module.exports = async (req, res) => {
     if (dbError) throw dbError;
 
     // 3. INSERT KE TABEL RINCIAN (order_items)
-    const itemInserts = items.map((item) => ({
-      order_id: newOrder.id,
-      item_name: item.nama,
-      // MEMASTIKAN KATEGORI BUNDLING TERSIMPAN BENAR
-      item_type:
-        item.kategori === "Bundling" ? "Bundling" : item.kategori || "General",
-      quantity: item.qty || 1,
-      price:
+    const itemInserts = items.map((item) => {
+      // Pastikan harga adalah angka murni
+      const hargaSatuan =
         typeof item.harga === "string"
-          ? item.harga
-          : `$${(item.harga * (item.qty || 1)).toLocaleString()}`,
-      status: "pending",
-    }));
+          ? parseInt(item.harga.replace(/[^\d]/g, "")) || 0
+          : item.harga || 0;
+
+      return {
+        order_id: newOrder.id,
+        item_name: item.nama,
+        item_type:
+          item.kategori === "Bundling"
+            ? "Bundling"
+            : item.kategori || "General",
+        quantity: item.qty || 1,
+        price: hargaSatuan, // SIMPAN ANGKA SATUAN SAJA (1800)
+        status: "pending",
+      };
+    });
 
     const { error: itemsError } = await supabase
       .from("order_items")
@@ -94,7 +100,7 @@ module.exports = async (req, res) => {
         (i) =>
           `- ${i.nama} (${i.qty}x) ${
             i.kategori === "Bundling" ? "[PAKET]" : ""
-          }`
+          }`,
       )
       .join("\n");
     let targetWebhook = process.env.DISCORD_WEBHOOK_URL;
@@ -124,7 +130,8 @@ module.exports = async (req, res) => {
               },
               {
                 name: "💰 Total Tagihan",
-                value: `**${totalHarga || "$0"}**`,
+                // MENGUBAH ANGKA MENJADI FORMAT BERKOMA DI DISCORD
+                value: `**$ ${(parseInt(totalHarga.replace(/[^\d]/g, "")) || 0).toLocaleString()}**`,
                 inline: false,
               },
             ],
