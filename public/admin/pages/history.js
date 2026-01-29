@@ -62,20 +62,26 @@ export const HistoryPage = {
 
     const calculateRevenue = (data) => {
       const revenue = data
-        .filter((h) =>
-          ["approved", "processed", "success"].includes(
-            h.status?.toLowerCase(),
-          ),
-        )
+        .filter((h) => {
+          const status = h.status?.toLowerCase();
+          // Hanya hitung yang statusnya sukses dan pastikan ada item yang approved
+          const hasApprovedItems = h.order_items?.some(
+            (item) => item.status === "approved",
+          );
+          return (
+            ["approved", "processed", "success", "completed"].includes(
+              status,
+            ) && hasApprovedItems
+          );
+        })
         .reduce((sum, h) => {
-          // Menghitung total dengan menjumlahkan 'price' dari array order_items
-          // Ini jauh lebih akurat daripada mengambil teks total_price
+          // Hanya jumlahkan price dari item yang statusnya 'approved'
           const itemTotal =
-            h.order_items?.reduce(
-              (s, item) => s + (Number(item.price) || 0),
-              0,
-            ) || 0;
-
+            h.order_items?.reduce((s, item) => {
+              return item.status === "approved"
+                ? s + (Number(item.price) || 0)
+                : s;
+            }, 0) || 0;
           return sum + itemTotal;
         }, 0);
 
@@ -117,22 +123,32 @@ export const HistoryPage = {
       tableBody.innerHTML = data
         .map((h) => {
           const currentStatus = (h.status || "pending").toLowerCase();
+
+          // Logika baru untuk menentukan status tampilan
+          const allItemsRejected =
+            h.order_items?.length > 0 &&
+            h.order_items.every((item) => item.status === "rejected");
+
           let statusColor = "#72767d";
           let statusLabel = h.status.toUpperCase();
 
-          if (["processed", "approved", "success"].includes(currentStatus)) {
-            statusColor = "#43b581";
-            statusLabel = "SUCCESS";
-          } else if (
+          if (
+            allItemsRejected ||
             ["rejected", "cancelled", "failed"].includes(currentStatus)
           ) {
             statusColor = "#f04747";
             statusLabel = "REJECTED";
+          } else if (
+            ["processed", "approved", "success", "completed"].includes(
+              currentStatus,
+            )
+          ) {
+            statusColor = "#43b581";
+            statusLabel = "SUCCESS";
           }
 
           const date = new Date(h.processed_at || h.created_at);
 
-          // Fallback jika item_name kosong, ambil dari order_items pertama
           const displayItem =
             h.item_name ||
             h.order_items?.[0]?.item_name +
@@ -140,9 +156,7 @@ export const HistoryPage = {
             "Multi Items";
 
           return `
-            <tr style="border-bottom: 1px solid #40444b; cursor:pointer;" class="hist-row" onclick="window.viewHistoryDetail('${
-              h.id
-            }')">
+            <tr style="border-bottom: 1px solid #40444b; cursor:pointer;" class="hist-row" onclick="window.viewHistoryDetail('${h.id}')">
                 <td style="padding: 15px; font-size: 0.8rem; color: #b9bbbe;">
                     ${date.toLocaleString("id-ID", {
                       day: "2-digit",
@@ -151,25 +165,24 @@ export const HistoryPage = {
                       minute: "2-digit",
                     })}
                 </td>
-                <td style="padding: 15px; font-weight:bold; color:#fff;">${
-                  h.requested_by
-                }</td>
+                <td style="padding: 15px; font-weight:bold; color:#fff;">${h.requested_by}</td>
                 <td style="padding: 15px;">
                     <div style="color:#fff; font-size:0.85rem; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${displayItem}</div>
-                    <div style="font-size:0.65rem; color:#5865F2; font-weight:bold;">${
-                      h.item_type || "LOGISTICS"
-                    }</div>
+                    <div style="font-size:0.65rem; color:#5865F2; font-weight:bold;">${h.item_type || "LOGISTICS"}</div>
                 </td>
                 <td style="padding: 15px; text-align:center;">
                     <span style="color:${statusColor}; font-weight:bold; font-size:0.65rem; text-transform:uppercase; border:1px solid ${statusColor}44; padding:4px 12px; border-radius:20px; background:${statusColor}22; display:inline-block; min-width:80px;">
                         ${statusLabel}
                     </span>
                 </td>
-                <td style="padding: 15px; color: #43b581; font-weight: bold;">${
-                  h.total_price
-                }</td>
+                <td style="padding: 15px; color: ${statusLabel === "REJECTED" ? "#f04747" : "#43b581"}; font-weight: bold;">
+                  $ ${(Number(h.total_price) || 0).toLocaleString()}
+                </td>
                 <td style="padding: 15px; color: #72767d; font-size: 0.8rem;">
-                  ${h.processed_by_name || "System"}
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-user-shield" style="color: #faa61a; font-size: 0.7rem;"></i>
+                    <span>${h.processed_by_name || (h.processed_by ? "Admin" : "System")}</span>
+                  </div>
                 </td>
             </tr>`;
         })
@@ -186,9 +199,7 @@ export const HistoryPage = {
         <div style="background: #18191c; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #444;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <strong style="color:#fff;">${item.item_name}</strong>
-            <span style="color:#43b581; font-weight:bold; background:#43b58122; padding:2px 8px; border-radius:4px;">x${
-              item.quantity
-            }</span>
+            <span style="color:${item.status === "rejected" ? "#f04747" : "#43b581"}; font-weight:bold; background:${item.status === "rejected" ? "#f0474722" : "#43b58122"}; padding:2px 8px; border-radius:4px;">x${item.quantity}</span>
           </div>
           ${
             item.sn_list
@@ -199,9 +210,7 @@ export const HistoryPage = {
             </div>`
               : ""
           }
-          <div style="font-size:0.65rem; color:${
-            item.status === "rejected" ? "#f04747" : "#72767d"
-          }; text-transform:uppercase; margin-top:5px; font-weight:bold;">
+          <div style="font-size:0.65rem; color:${item.status === "rejected" ? "#f04747" : "#72767d"}; text-transform:uppercase; margin-top:5px; font-weight:bold;">
             Status: ${item.status}
           </div>
         </div>`,
@@ -234,9 +243,7 @@ export const HistoryPage = {
                 <div style="background: #202225; padding: 15px; border-radius: 8px; border: 1px solid #444;">
                     <p style="margin:0; display:flex; justify-content:space-between; align-items:center;">
                         <span style="color:#b9bbbe;">Total Transaksi:</span>
-                        <span style="color:#43b581; font-weight:bold; font-size:1.2rem;">${
-                          order.total_price
-                        }</span>
+                        <span style="color:#43b581; font-weight:bold; font-size:1.2rem;">$ ${(Number(order.total_price) || 0).toLocaleString()}</span>
                     </p>
                 </div>
             </div>

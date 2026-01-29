@@ -106,18 +106,23 @@ export const AdminDashboard = {
 
       if (items) {
         items.forEach((item) => {
-          // Hanya hitung jika status order (bukan status item) adalah approved/processed/success
-          const orderStatus = item.orders?.status?.toLowerCase() || "";
+          // STANDAR BARU: Cek status langsung di item_status
+          const itemStatus = (item.status || "").toLowerCase();
+          const orderStatus = (item.orders?.status || "").toLowerCase();
 
-          if (["approved", "processed", "success"].includes(orderStatus)) {
-            // Catat ID Order yang unik
+          // Item dihitung jika status item itu sendiri approved/success
+          // Dan pastikan ordernya bukan yang sedang pending/cancelled
+          if (
+            ["approved", "success"].includes(itemStatus) &&
+            !["pending", "cancelled"].includes(orderStatus)
+          ) {
             if (item.order_id) metrics.totalOrders.add(item.order_id);
 
             // Perhitungan Revenue & Qty
             const price = Number(item.price) || 0;
             const qty = Number(item.quantity) || 1;
 
-            metrics.revenue += price;
+            metrics.revenue += price; // Omzet valid
             metrics.itemsOut += qty;
 
             // Stats Item & Kategori

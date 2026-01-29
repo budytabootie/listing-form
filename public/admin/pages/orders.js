@@ -359,6 +359,7 @@ export const OrdersPage = {
             p_weapon_ids: selectedWeaponIds,
             p_sn_notes: snNotes,
             p_admin_name: userData.nama_lengkap,
+            p_admin_id: userData.id, // <--- TAMBAHKAN LINE INI
           });
 
           if (error) throw error;
@@ -383,9 +384,15 @@ export const OrdersPage = {
             .eq("status", "pending");
 
           if (!remainingPending || remainingPending.length === 0) {
+            // SAAT ORDER SELESAI KARENA REJECT, ISI DATA ADMIN
             await supabase
               .from("orders")
-              .update({ status: "completed" })
+              .update({
+                status: "processed",
+                processed_at: new Date().toISOString(),
+                processed_by: userData.id, // ID dari users_login
+                processed_by_name: userData.nama_lengkap, // Nama dari users_login
+              })
               .eq("id", order.id);
           }
         }

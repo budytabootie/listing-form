@@ -6,6 +6,7 @@ export const Auth = {
       // 1. Ambil config dari server
       const configRes = await fetch("/api/get-config");
       const config = await configRes.json();
+      const token = localStorage.getItem("sessionToken");
 
       // 2. Inisialisasi Supabase
       const supabaseInstance = supabase.createClient(
@@ -14,17 +15,16 @@ export const Auth = {
         {
           global: {
             headers: {
-              "x-custom-auth": config.adminToken,
+              "x-session-token": token,
             },
           },
-        }
+        },
       );
 
       // 3. Inisialisasi API Wrapper
       API.init(supabaseInstance, config.supabaseUrl);
 
       // 4. Cek Session Token
-      const token = localStorage.getItem("sessionToken");
       if (!token) return this.redirectToLogin();
 
       // 5. Validasi session ke Database
